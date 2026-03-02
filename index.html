@@ -1,0 +1,2894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Command Center Portal</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="logo.png">
+</head>
+<body>
+    <header>
+        <div class="header-content container">
+            <div class="logo">
+                <div class="logo-icon">
+                    <img src="logo.png" alt="Crisis Management Logo" />
+                </div>
+                <div class="logo-text">
+                    <h1>Crisis Management Dashboard</h1>
+                    <p>Weekly Crisis Meeting Agenda</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="theme-toggle" class="theme-toggle" title="Toggle Dark Mode">
+                    <span id="theme-icon">🌙</span>
+                </button>
+                <div class="date-display">
+                    <span id="current-date"></span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">
+                <h2 id="dashboard-main-title">Weekly Status Report</h2>
+                <p id="reporting-period">Current reporting period: Loading...</p>
+            </div>
+            <div class="type-selector">
+                <div class="segmented-control">
+                    <input type="radio" name="data-type" id="type-incident" value="Incident" checked>
+                    <label for="type-incident">Incidents</label>
+                    <input type="radio" name="data-type" id="type-crisis" value="Crisis">
+                    <label for="type-crisis">Crises</label>
+                    <!-- <input type="radio" name="data-type" id="type-action" value="Action">
+                    <label for="type-action">Action Items</label> -->
+                    <div class="selection-slider"></div>
+                </div>
+            </div>
+            <div class="calendar-selector">
+                <div class="segmented-control period-selector">
+                    <input type="radio" name="time-period" id="period-week" value="Week" checked>
+                    <label for="period-week">This Week</label>
+                    <input type="radio" name="time-period" id="period-year" value="Year">
+                    <label for="period-year">This Year</label>
+                    <div class="selection-slider"></div>
+                </div>
+                <div class="calendar-controls">
+                    <button id="prev-week" class="calendar-nav-btn" title="Previous Week">←</button>
+                    <div class="formatted-date-container" style="position: relative;">
+                        <input type="text" id="week-picker-display" class="calendar-input" placeholder="dd/mm/yyyy">
+                        <input type="date" id="week-picker-hidden" style="position: absolute; top: 0; left: 0; opacity: 0; width: 100%; height: 100%; pointer-events: none;">
+                    </div>
+                    <button id="next-week" class="calendar-nav-btn" title="Next Week">→</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-container">
+            <div class="stat-card" id="stat-total">
+                <div class="stat-label">Total Incidents</div>
+                <div class="stat-value">0</div>
+            </div>
+            <div class="stat-card open" id="stat-open">
+                <div class="stat-label">Open Incidents</div>
+                <div class="stat-value">0</div>
+            </div>
+            <div class="stat-card closed" id="stat-closed">
+                <div class="stat-label">Closed Incidents</div>
+                <div class="stat-value">0</div>
+            </div>
+        </div>
+
+        <div class="table-toolbar">
+            <div class="search-box">
+                <input type="text" id="table-search" placeholder="Search incidents..." class="form-control">
+            </div>
+            <div class="toolbar-actions">
+                <button id="add-action-btn" class="btn btn-primary">
+                    <span>✚</span> Add New Incident
+                </button>
+                <button id="export-btn" class="btn btn-outline" title="Export Report">
+                    <span>↓</span> Export Report
+                </button>
+                <button id="import-btn" class="btn btn-outline" title="Import CSV Data" aria-label="Import Data">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                </button>
+                <input type="file" id="import-file-input" style="display: none;" accept=".csv">
+                <button id="regularize-btn" class="btn btn-outline" title="Initialize SQLite database and migrate CSV data" aria-label="Initialize Database">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
+                        <path d="M21 3v5h-5"></path>
+                        <path d="m9 12 2 2 4-4"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="row-limit-box">
+                <div class="column-visibility-wrapper" style="position: relative;">
+                    <button id="columns-btn" class="btn btn-outline" title="Column Visibility" aria-label="Column Visibility">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                        </svg>
+                    </button>
+                    <div id="column-dropdown" class="column-dropdown">
+                        <!-- Checkboxes will be dynamically generated or hardcoded -->
+                        <label class="column-option"><input type="checkbox" checked data-column="0"> Hide</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="1"> Incident No.</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="2"> ITSM Ticket</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="3"> Crisis/Incident</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="4"> Description</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="5"> System</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="6"> Owner</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="7"> Status</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="8"> Start Date</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="9"> Start Time</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="10"> Target Date</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="11"> Closure Date</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="12"> End Time</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="13"> Age</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="14"> TTA</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="15"> TTR</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="16"> TTD</label>
+                    </div>
+                </div>
+                <label for="row-limit">Show Rows:</label>
+                <select id="row-limit" class="form-control">
+                    <option value="all">All Rows</option>
+                    <option value="2" selected>2 Rows</option>
+                    <option value="4">4 Rows</option>
+                    <option value="6">6 Rows</option>
+                    <option value="8">8 Rows</option>
+                    <option value="10">10 Rows</option>
+                </select>
+                <button id="view-mode-btn" class="btn btn-outline" title="View Mode" aria-label="View Mode">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="table-container limit-2">
+            <table>
+                <thead>
+                    <tr>
+                        <th data-column="0" style="width: 40px;"></th>
+                        <th data-column="1">Incident No.</th>
+                        <th data-column="2">ITSM Ticket</th>
+                        <th data-column="3">Crisis/Incident</th>
+                        <th data-column="4">Description</th>
+                        <th data-column="5">System</th>
+                        <th data-column="6">Owner</th>
+                        <th data-column="7">Incident Status</th>
+                        <th data-column="8">Incident Start Date</th>
+                        <th data-column="9">Start Time</th>
+                        <th data-column="10">Target Date</th>
+                        <th data-column="11">Closure Date</th>
+                        <th data-column="12">End Time</th>
+                        <th data-column="13">Age</th>
+                        <th data-column="14">TTA</th>
+                        <th data-column="15">TTR</th>
+                        <th data-column="16">TTD</th>
+                        <!-- <th>Postponed</th> -->
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="pagination-container">
+            <button id="prev-page" class="pagination-btn" disabled title="Previous Page">←</button>
+            <span class="pagination-info"><span id="current-page">1</span> of <span id="total-pages">1</span></span>
+            <button id="next-page" class="pagination-btn" title="Next Page">→</button>
+        </div>
+
+        <footer>
+            <p>Crisis Management Dashboard • IT Command Center • Internal Use Only</p>
+        </footer>
+    </div>
+
+    <!-- Incident Detail Modal -->
+    <div id="incident-detail-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-header-left">
+                    <h3>Incident Detailed View</h3>
+                    <div class="modal-nav">
+                        <button id="prev-incident" class="nav-btn" title="Previous Incident">←</button>
+                        <span id="nav-count" class="nav-count">0 of 0</span>
+                        <button id="next-incident" class="nav-btn" title="Next Incident">→</button>
+                    </div>
+                </div>
+                <span class="close-modal" id="close-detail-modal">&times;</span>
+            </div>
+            <div class="incident-details">
+                <!-- Content populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Add New Incident Modal -->
+    <div id="add-action-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add New Incident</h3>
+                <span class="close-modal">&times;</span>
+            </div>
+            <form id="add-action-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="new-action-no">Incident No.</label>
+                        <input type="text" id="new-action-no" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="new-itsm-ticket">ITSM Ticket</label>
+                        <input type="text" id="new-itsm-ticket" class="form-control" placeholder="e.g. INC0012345">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="new-crisis">Crisis/Incident</label>
+                        <input type="text" id="new-crisis" class="form-control" placeholder="e.g. Payment processing timeout errors" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="new-system">System</label>
+                        <input type="text" id="new-system" class="form-control" placeholder="e.g. Payment Gateway, Customer Portal" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="new-owner">Owner</label>
+                        <input type="text" id="new-owner" class="form-control" placeholder="Owner Name" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="new-start-date-display">Incident Start Date</label>
+                        <div style="position: relative;">
+                            <input type="text" id="new-start-date-display" class="form-control" placeholder="dd/mm/yyyy" required>
+                            <input type="date" id="new-start-date-hidden" style="position: absolute; top: 0; left: 0; opacity: 0; width: 100%; height: 100%; pointer-events: none;">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="new-start-time">Start Time</label>
+                        <div class="input-with-btn">
+                            <input type="time" id="new-start-time" class="form-control" required>
+                            <button type="button" class="btn-now" data-target="new-start-time">Now</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="new-target-date-display">Target Date</label>
+                        <div style="position: relative;">
+                            <input type="text" id="new-target-date-display" class="form-control" placeholder="dd/mm/yyyy">
+                            <input type="date" id="new-target-date-hidden" style="position: absolute; top: 0; left: 0; opacity: 0; width: 100%; height: 100%; pointer-events: none;">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="new-end-time">End Time (Optional)</label>
+                        <div class="input-with-btn">
+                            <input type="time" id="new-end-time" class="form-control">
+                            <button type="button" class="btn-now" data-target="new-end-time">Now</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="new-tta">Time to Acknowledge (TTA)</label>
+                        <div class="duration-input-group">
+                            <div class="duration-part">
+                                <label>DD</label>
+                                <div class="number-input-wrapper">
+                                    <input type="number" id="new-tta-dd" class="form-control" min="0" placeholder="0">
+                                </div>
+                            </div>
+                            <div class="duration-part">
+                                <label>HH</label>
+                                <div class="number-input-wrapper">
+                                    <input type="number" id="new-tta-hh" class="form-control" min="0" max="23" placeholder="0">
+                                </div>
+                            </div>
+                            <div class="duration-part">
+                                <label>MM</label>
+                                <div class="number-input-wrapper">
+                                    <input type="number" id="new-tta-mm" class="form-control" min="0" max="59" placeholder="0">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="new-ttr">Time to Recover (TTR)</label>
+                        <div class="duration-input-group">
+                            <div class="duration-part">
+                                <label>DD</label>
+                                <div class="number-input-wrapper">
+                                    <input type="number" id="new-ttr-dd" class="form-control" min="0" placeholder="0">
+                                </div>
+                            </div>
+                            <div class="duration-part">
+                                <label>HH</label>
+                                <div class="number-input-wrapper">
+                                    <input type="number" id="new-ttr-hh" class="form-control" min="0" max="23" placeholder="0">
+                                </div>
+                            </div>
+                            <div class="duration-part">
+                                <label>MM</label>
+                                <div class="number-input-wrapper">
+                                    <input type="number" id="new-ttr-mm" class="form-control" min="0" max="59" placeholder="0">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="new-ttd">Time to Detect (TTD)</label>
+                        <div class="duration-input-group">
+                            <div class="duration-part">
+                                <label>DD</label>
+                                <div class="number-input-wrapper">
+                                    <input type="number" id="new-ttd-dd" class="form-control" min="0" placeholder="0">
+                                </div>
+                            </div>
+                            <div class="duration-part">
+                                <label>HH</label>
+                                <div class="number-input-wrapper">
+                                    <input type="number" id="new-ttd-hh" class="form-control" min="0" max="23" placeholder="0">
+                                </div>
+                            </div>
+                            <div class="duration-part">
+                                <label>MM</label>
+                                <div class="number-input-wrapper">
+                                    <input type="number" id="new-ttd-mm" class="form-control" min="0" max="59" placeholder="0">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="new-reference-group" class="form-group" style="display: none;">
+                        <label class="form-label" for="new-reference">Link to Incident/Crisis (Optional)</label>
+                        <select id="new-reference" class="form-control">
+                            <option value="">None</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label class="form-label" for="new-description">Description</label>
+                    <textarea id="new-description" class="form-control" placeholder="Enter description of the incident..."></textarea>
+                </div>
+                <div class="form-actions" style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button type="button" class="btn btn-secondary close-modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-action-btn">Save Crisis</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Generic Edit Modal -->
+    <div id="edit-value-modal" class="modal" style="z-index: 2000;">
+        <div class="modal-content" style="max-width: 450px; margin-top: 15vh;">
+            <div class="modal-header">
+                <h3 id="edit-modal-title">Edit Value</h3>
+                <span class="close-modal" id="close-edit-modal">&times;</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label" id="edit-modal-label" for="edit-modal-input">New Value</label>
+                <div class="input-with-btn">
+                    <input type="text" id="edit-modal-input" class="form-control">
+                    <button type="button" id="edit-modal-now-btn" class="btn-now" style="display: none;">Now</button>
+                </div>
+                <div id="edit-modal-date-container" style="display: none; position: relative;">
+                    <input type="text" id="edit-modal-date-display" class="form-control" placeholder="dd/mm/yyyy">
+                    <input type="date" id="edit-modal-date-hidden" style="position: absolute; top: 0; left: 0; opacity: 0; width: 100%; height: 100%; pointer-events: none;">
+                </div>
+                <div id="edit-modal-duration-container" style="display: none;">
+                    <div class="duration-input-group">
+                        <div class="duration-part">
+                            <label>DD</label>
+                            <div class="number-input-wrapper">
+                                <button type="button" class="number-btn minus">-</button>
+                                <input type="number" id="edit-duration-dd" class="form-control" min="0" placeholder="0">
+                                <button type="button" class="number-btn plus">+</button>
+                            </div>
+                        </div>
+                        <div class="duration-part">
+                            <label>HH</label>
+                            <div class="number-input-wrapper">
+                                <button type="button" class="number-btn minus">-</button>
+                                <input type="number" id="edit-duration-hh" class="form-control" min="0" max="23" placeholder="0">
+                                <button type="button" class="number-btn plus">+</button>
+                            </div>
+                        </div>
+                        <div class="duration-part">
+                            <label>MM</label>
+                            <div class="number-input-wrapper">
+                                <button type="button" class="number-btn minus">-</button>
+                                <input type="number" id="edit-duration-mm" class="form-control" min="0" max="59" placeholder="0">
+                                <button type="button" class="number-btn plus">+</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <textarea id="edit-modal-textarea" class="form-control" style="display: none; min-height: 120px;"></textarea>
+            </div>
+            <div class="form-actions" style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary" id="cancel-edit-modal">Cancel</button>
+                <button type="button" id="edit-modal-save" class="btn btn-primary">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Options Modal -->
+    <div id="export-options-modal" class="modal" style="z-index: 3000;">
+        <div class="modal-content" style="max-width: 500px; margin-top: 20vh;">
+            <div class="modal-header">
+                <h3>Export Options</h3>
+                <span class="close-modal" id="close-export-modal">&times;</span>
+            </div>
+            <div style="margin-bottom: 1.5rem;">
+                <p style="margin-bottom: 1.5rem;">Select the range for the export. This will download the current <strong id="export-modal-data-type">Incidents</strong> data.</p>
+                <div class="export-range-boxes">
+                    <label class="export-box" id="export-box-week">
+                        <input type="radio" name="export-range" value="week" checked>
+                        <div class="export-box-content">
+                            <span class="export-box-icon">📅</span>
+                            <span class="export-box-title">Current Week</span>
+                        </div>
+                    </label>
+                    <label class="export-box" id="export-box-all">
+                        <input type="radio" name="export-range" value="all">
+                        <div class="export-box-content">
+                            <span class="export-box-icon">📈</span>
+                            <span class="export-box-title">All Time</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            <div class="form-actions" style="display: flex; gap: 1rem; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary" id="cancel-export-modal">Cancel</button>
+                <button type="button" id="confirm-export-btn" class="btn btn-primary">Confirm Export</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Modal -->
+    <div id="notification-modal" class="modal" style="z-index: 3000;">
+        <div class="modal-content" style="max-width: 400px; margin-top: 20vh;">
+            <div class="modal-header">
+                <h3 id="notification-title">Notification</h3>
+                <span class="close-modal" id="notification-close">&times;</span>
+            </div>
+            <div id="notification-message" style="margin-bottom: 1.5rem; line-height: 1.5;"></div>
+            <div id="notification-progress-container" style="display: none; margin-bottom: 1.5rem;">
+                <div style="display: flex; height: 12px; width: 100%; background-color: var(--border-color); border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color);">
+                    <div id="progress-new" style="width: 0%; background-color: #10b981; transition: width 0.3s ease;"></div>
+                    <div id="progress-updated" style="width: 0%; background-color: #3b82f6; transition: width 0.3s ease;"></div>
+                    <div id="progress-skipped" style="width: 0%; background-color: #3b82f6; transition: width 0.3s ease;"></div>
+                    <div id="progress-errors" style="width: 0%; background-color: #ef4444; transition: width 0.3s ease;"></div>
+                </div>
+            </div>
+            <div class="form-actions" style="display: flex; gap: 1rem; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary" id="notification-cancel" style="display: none;">Cancel</button>
+                <button type="button" id="notification-confirm" class="btn btn-primary">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            alert("Error: " + msg + "\nLine: " + line + "\nURL: " + url);
+            return false;
+        };
+        // Global state to store current view data
+        let currentYear, currentWeek;
+        let currentDataType = 'Incident';
+        let currentActions = [];
+        let allIncidentsAndCrises = []; // Store for Action Item references
+        let lastSyncedTime = 0;
+        let isPolling = false;
+        let currentStatusFilter = 'all'; // Filter for Total, Open, Closed stat cards
+        let hiddenRows = new Set();
+        let currentPage = 1; // Pagination state
+        let currentSortColumn = 1; // Default sort by Incident No.
+        let currentSortOrder = 'asc'; // Default sort order
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM Content Loaded');
+            // --- Add New Incident Modal Logic ---
+            const addActionBtn = document.getElementById('add-action-btn');
+            const addActionModal = document.getElementById('add-action-modal');
+            const addActionForm = document.getElementById('add-action-form');
+            const closeModalBtns = document.querySelectorAll('.close-modal');
+            const newActionNoInput = document.getElementById('new-action-no');
+            const newStartDateHidden = document.getElementById('new-start-date-hidden');
+            const newStartDateDisplay = document.getElementById('new-start-date-display');
+            const newTargetDateHidden = document.getElementById('new-target-date-hidden');
+            const newTargetDateDisplay = document.getElementById('new-target-date-display');
+
+            // Setup dual pickers for new incident form
+            setupDualDatePicker(newStartDateDisplay, newStartDateHidden);
+            setupDualDatePicker(newTargetDateDisplay, newTargetDateHidden);
+
+            if (addActionBtn) {
+                addActionBtn.addEventListener('click', () => {
+                    console.log('Add button clicked');
+                    // Auto-generate Action ID
+                    const maxId = (currentItems || []).reduce((max, a) => {
+                        const id = parseInt(a['Action No.']);
+                        return !isNaN(id) && id > max ? id : max;
+                    }, 0);
+                    if (newActionNoInput) newActionNoInput.value = maxId + 1;
+                    
+                    // Set default start date and time to now
+                    const now = new Date();
+                    const todayISO = now.toISOString().split('T')[0];
+                    const currentTime = getCurrentTime(); // hh:mm AM/PM
+                    
+                    if (newStartDateHidden) newStartDateHidden.value = todayISO;
+                    if (newStartDateDisplay) newStartDateDisplay.value = isoToDMY(todayISO);
+                    const startTimeEl = document.getElementById('new-start-time');
+                    if (startTimeEl) {
+                        // For <input type="time">, we still need 24h format HH:mm
+                        const hh24 = String(now.getHours()).padStart(2, '0');
+                        const mm = String(now.getMinutes()).padStart(2, '0');
+                        startTimeEl.value = `${hh24}:${mm}`;
+                    }
+                    
+                    if (addActionModal) addActionModal.style.display = 'block';
+                });
+            }
+
+            if (addActionForm) {
+                addActionForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    
+                    const actionNo = newActionNoInput ? newActionNoInput.value.trim() : '';
+                    if (!actionNo) {
+                        showNotification('Error', 'Action Number is required.');
+                        return;
+                    }
+                    const itsmTicket = document.getElementById('new-itsm-ticket')?.value || '';
+                    const crisis = document.getElementById('new-crisis')?.value || '';
+                    const system = document.getElementById('new-system')?.value || '';
+                    const owner = document.getElementById('new-owner')?.value || '';
+                    const startDate = newStartDateHidden ? newStartDateHidden.value : '';
+                    const startTime = document.getElementById('new-start-time')?.value || '';
+                    const targetDate = newTargetDateHidden ? newTargetDateHidden.value : '';
+                    const endTime = document.getElementById('new-end-time')?.value || '';
+                    const description = document.getElementById('new-description')?.value.trim() || '';
+                    const crisisReference = document.getElementById('new-reference')?.value || '';
+                    
+                    const tta = formatDuration(
+                        parseInt(document.getElementById('new-tta-dd')?.value) || 0,
+                        parseInt(document.getElementById('new-tta-hh')?.value) || 0,
+                        parseInt(document.getElementById('new-tta-mm')?.value) || 0
+                    );
+                    const ttr = formatDuration(
+                        parseInt(document.getElementById('new-ttr-dd')?.value) || 0,
+                        parseInt(document.getElementById('new-ttr-hh')?.value) || 0,
+                        parseInt(document.getElementById('new-ttr-mm')?.value) || 0
+                    );
+                    const ttd = formatDuration(
+                        parseInt(document.getElementById('new-ttd-dd')?.value) || 0,
+                        parseInt(document.getElementById('new-ttd-hh')?.value) || 0,
+                        parseInt(document.getElementById('new-ttd-mm')?.value) || 0
+                    );
+                    
+                    // Calculate initial Age with time precision
+                    let initialAgeStr = "00:00";
+                    if (startDate) {
+                        let start;
+                        const [y, m, d] = startDate.split('-').map(Number);
+                        const [hh, mm] = startTime.split(':').map(Number);
+                        start = new Date(y, m - 1, d, hh || 0, mm || 0);
+                        
+                        const now = new Date();
+                        
+                        if (start && !isNaN(start.getTime())) {
+                            const diffMs = now - start;
+                            const diffMins = Math.floor(diffMs / (1000 * 60));
+                            
+                            if (diffMins < 0) {
+                                initialAgeStr = "00:00";
+                            } else if (diffMins < 1440) {
+                                const h = Math.floor(diffMins / 60);
+                                const m = diffMins % 60;
+                                initialAgeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                            } else {
+                                initialAgeStr = `${Math.floor(diffMins / 1440)}d`;
+                            }
+                        }
+                    }
+
+                    const newAction = {
+                        "Action No.": actionNo,
+                        "ITSM Ticket": itsmTicket,
+                        "Crisis/Incident": crisis,
+                        "System": system,
+                        "Owner": owner,
+                        "Action Status": "Open",
+                        "Action Start Date": startDate,
+                        "Start Time": startTime, // Store in 24-hour format (HH:MM)
+                        "Target Date": targetDate,
+                        "Description": description,
+                        "Remarks": "",
+                        "Actions": "",
+                        "End Date": "",
+                        "End Time": endTime, // Store in 24-hour format (HH:MM)
+                        "Section Head": "IT Operations", // Defaults for CSV columns
+                        "Category": "Infrastructure",
+                        "Action Tracker ( Weekly Crisis Meeting)": "",
+                        "Target Date last update": startDate,
+                        "Crossed Target Date": "No",
+                        "Activity Status": "On Track",
+                        "Age": initialAgeStr,
+                        "Age By Months/Year": "0",
+                        "Crisis Reference": crisisReference,
+                        "Time to Acknowledge": tta,
+                        "Time to Recover": ttr,
+                        "Time to Detect": ttd,
+                        "History": "[]"
+                    };
+
+                    try {
+                        await saveActionUpdate(newAction, null, false); // Pass isUpdate=false
+                        
+                        // Hide modal and refresh
+                        if (addActionModal) addActionModal.style.display = 'none';
+                        addActionForm.reset();
+                        loadDashboardData(weekPickerHidden.value);
+                    } catch (err) {
+                        // Error already handled in saveActionUpdate (notification shown)
+                        console.log('Form submission failed:', err.message);
+                    }
+                });
+            }
+
+            closeModalBtns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const modal = btn.closest('.modal');
+                    if (modal) {
+                        modal.style.display = 'none';
+                        if (modal.id === 'add-action-modal' && addActionForm) {
+                            addActionForm.reset();
+                        }
+                        // Update dashboard when closing incident detail modal to reflect any edits
+                        if (modal.id === 'incident-detail-modal') {
+                            updateDashboardUI(currentItems);
+                        }
+                    }
+                });
+            });
+
+            // --- Type Selection Logic ---
+            const typeRadios = document.querySelectorAll('input[name="data-type"]');
+            typeRadios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    currentDataType = e.target.value;
+                    currentPage = 1; // Reset to first page when data type changes
+                    updateDynamicLabels();
+                    loadDashboardData(weekPickerHidden.value);
+                });
+            });
+
+            // --- Time Period Selection Logic ---
+            window.currentTimePeriod = 'Week';
+            const periodRadios = document.querySelectorAll('input[name="time-period"]');
+            const calendarControls = document.querySelector('.calendar-controls');
+            
+            periodRadios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    window.currentTimePeriod = e.target.value;
+                    if (window.currentTimePeriod === 'Year') {
+                        calendarControls.style.visibility = 'hidden';
+                        calendarControls.style.pointerEvents = 'none';
+                    } else {
+                        calendarControls.style.visibility = 'visible';
+                        calendarControls.style.pointerEvents = 'auto';
+                    }
+                    updateDynamicLabels();
+                    loadDashboardData(weekPickerHidden.value);
+                });
+            });
+
+            function updateDynamicLabels() {
+                let singular, plural;
+                if (currentDataType === 'Crisis') {
+                    singular = 'Crisis';
+                    plural = 'Crises';
+                } else if (currentDataType === 'Action') {
+                    singular = 'Action Item';
+                    plural = 'Action Items';
+                } else {
+                    singular = 'Incident';
+                    plural = 'Incidents';
+                }
+
+                const periodLabel = window.currentTimePeriod === 'Year' ? 'Yearly' : 'Weekly';
+                document.getElementById('dashboard-main-title').textContent = `${periodLabel} Status Report`;
+                document.getElementById('stat-total').querySelector('.stat-label').textContent = `Total ${plural}`;
+                document.getElementById('stat-open').querySelector('.stat-label').textContent = `Open ${plural}`;
+                document.getElementById('stat-closed').querySelector('.stat-label').textContent = `Closed ${plural}`;
+                document.getElementById('table-search').placeholder = `Search ${plural.toLowerCase()}...`;
+                document.getElementById('add-action-btn').innerHTML = `<span>✚</span> Add New ${singular}`;
+                
+                // Show/hide reference group in add modal
+                const refGroup = document.getElementById('new-reference-group');
+                if (refGroup) {
+                    refGroup.style.display = currentDataType === 'Action' ? 'block' : 'none';
+                }
+
+                // Update table headers
+                const headers = document.querySelectorAll('thead th');
+                if (headers.length > 8) {
+                    headers[1].textContent = `${singular} No.`;
+                    headers[3].textContent = singular;
+                    headers[7].textContent = `${singular} Status`;
+                    headers[8].textContent = `${singular} Start Date`;
+                }
+
+                // Update column visibility dropdown labels
+                const dropdown = document.getElementById('column-dropdown');
+                if (dropdown) {
+                    const updateDropdownLabel = (col, text) => {
+                        const cb = dropdown.querySelector(`input[data-column="${col}"]`);
+                        if (cb && cb.nextSibling) cb.nextSibling.textContent = ` ${text}`;
+                    };
+                    updateDropdownLabel("1", `${singular} No.`);
+                    updateDropdownLabel("2", "ITSM Ticket");
+                    updateDropdownLabel("3", singular);
+                    updateDropdownLabel("7", "Status");
+                    updateDropdownLabel("8", "Start Date");
+                }
+
+                // Update modal labels
+                const addModal = document.getElementById('add-action-modal');
+                if (addModal) {
+                    addModal.querySelector('h3').textContent = `Add New ${singular}`;
+                    addModal.querySelector('label[for="new-action-no"]').textContent = `${singular} No.`;
+                    const crisisLabel = addModal.querySelector('label[for="new-crisis"]');
+                    if (crisisLabel) crisisLabel.textContent = singular;
+                    addModal.querySelector('label[for="new-start-date-display"]').textContent = `${singular} Start Date`;
+                    const saveBtn = document.getElementById('save-action-btn');
+                    if (saveBtn) saveBtn.textContent = `Save ${singular}`;
+                }
+                const detailModal = document.getElementById('incident-detail-modal');
+                if (detailModal) {
+                    const detailModalHeader = detailModal.querySelector('h3');
+                    if (detailModalHeader) {
+                        detailModalHeader.textContent = `${singular} Detailed View`;
+                    }
+                }
+            }
+
+            // --- Theme logic ---
+            const themeToggle = document.getElementById('theme-toggle');
+            const themeIcon = document.getElementById('theme-icon');
+            const htmlElement = document.documentElement;
+
+            // --- Number Input Custom Buttons Logic ---
+            document.addEventListener('click', (e) => {
+                if (e.target.classList.contains('number-btn')) {
+                    const wrapper = e.target.closest('.number-input-wrapper');
+                    if (!wrapper) return;
+                    
+                    const input = wrapper.querySelector('input[type="number"]');
+                    if (!input) return;
+                    
+                    let val = parseInt(input.value) || 0;
+                    const min = input.hasAttribute('min') ? parseInt(input.getAttribute('min')) : -Infinity;
+                    const max = input.hasAttribute('max') ? parseInt(input.getAttribute('max')) : Infinity;
+                    
+                    if (e.target.classList.contains('plus')) {
+                        val++;
+                    } else if (e.target.classList.contains('minus')) {
+                        val--;
+                    }
+                    
+                    // Respect min/max
+                    if (val < min) val = min;
+                    if (val > max) val = max;
+                    
+                    input.value = val;
+                    
+                    // Trigger input event for any listeners
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
+
+            const savedTheme = localStorage.getItem('theme');
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const initialTheme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
+            setTheme(initialTheme);
+
+            themeToggle.addEventListener('click', () => {
+                const currentTheme = htmlElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                setTheme(newTheme);
+            });
+
+            function setTheme(theme) {
+                htmlElement.setAttribute('data-theme', theme);
+                localStorage.setItem('theme', theme);
+                themeIcon.textContent = theme === 'dark' ? '☀️' : '🌙';
+            }
+
+            // --- Dashboard Data Logic ---
+            const viewModeBtn = document.getElementById('view-mode-btn');
+            const weekPickerDisplay = document.getElementById('week-picker-display');
+
+            viewModeBtn.addEventListener('click', () => {
+                hiddenRows.clear();
+                
+                // Reset in database
+                fetch('/api/show-all-rows', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: currentDataType })
+                }).catch(err => console.error('Error showing all rows:', err));
+
+                updateDashboardUI(currentItems);
+
+                // Show a brief notification
+                showNotificationModal({
+                    title: 'Rows Restored',
+                    message: 'All manually hidden rows have been restored to the view.'
+                });
+            });
+
+            const weekPickerHidden = document.getElementById('week-picker-hidden');
+            const reportingPeriod = document.getElementById('reporting-period');
+            const detailsContainer = document.querySelector('.incident-details');
+            const detailModal = document.getElementById('incident-detail-modal');
+            const closeDetailModalBtn = document.getElementById('close-detail-modal');
+
+            // --- Column Visibility Logic ---
+            const columnsBtn = document.getElementById('columns-btn');
+            const columnDropdown = document.getElementById('column-dropdown');
+            const columnCheckboxes = columnDropdown.querySelectorAll('input[type="checkbox"]');
+            
+            // --- Sorting Logic ---
+            const tableHeaders = document.querySelectorAll('thead th');
+            tableHeaders.forEach(th => {
+                th.addEventListener('click', () => {
+                    const colIndex = parseInt(th.getAttribute('data-column'));
+                    // Allow sorting for Incident No. (1), date columns (8, 10, 11) and age column (13)
+                    const sortableColumns = [1, 8, 10, 11, 13];
+                    if (isNaN(colIndex) || !sortableColumns.includes(colIndex)) return;
+
+                    if (currentSortColumn === colIndex) {
+                        currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        currentSortColumn = colIndex;
+                        currentSortOrder = 'asc';
+                    }
+
+                    // Update header UI
+                    tableHeaders.forEach(header => {
+                        header.classList.remove('sort-asc', 'sort-desc');
+                    });
+                    th.classList.add(currentSortOrder === 'asc' ? 'sort-asc' : 'sort-desc');
+
+                    updateDashboardUI(currentItems);
+                });
+            });
+
+            // Load visibility from localStorage or default to all visible
+            let visibleColumns = JSON.parse(localStorage.getItem('visibleColumns')) || [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+            
+            function applyColumnVisibility() {
+                const table = document.querySelector('table');
+                const rows = table.querySelectorAll('tr');
+                
+                rows.forEach(row => {
+                    const cells = row.cells;
+                    
+                    // Handle empty state row with colspan
+                    if (cells.length === 1 && cells[0].hasAttribute('colspan')) {
+                        cells[0].setAttribute('colspan', visibleColumns.length);
+                        return;
+                    }
+
+                    for (let i = 0; i < cells.length; i++) {
+                        if (visibleColumns.includes(i)) {
+                            cells[i].classList.remove('col-hidden');
+                        } else {
+                            cells[i].classList.add('col-hidden');
+                        }
+                    }
+                });
+                
+                // Update checkboxes in dropdown
+                columnCheckboxes.forEach(cb => {
+                    const colIndex = parseInt(cb.getAttribute('data-column'));
+                    cb.checked = visibleColumns.includes(colIndex);
+                });
+            }
+
+            columnsBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                columnDropdown.classList.toggle('show');
+            });
+
+            columnCheckboxes.forEach(cb => {
+                cb.addEventListener('change', () => {
+                    const colIndex = parseInt(cb.getAttribute('data-column'));
+                    if (cb.checked) {
+                        if (!visibleColumns.includes(colIndex)) {
+                            visibleColumns.push(colIndex);
+                        }
+                    } else {
+                        visibleColumns = visibleColumns.filter(i => i !== colIndex);
+                    }
+                    localStorage.setItem('visibleColumns', JSON.stringify(visibleColumns));
+                    applyColumnVisibility();
+                });
+            });
+
+            // Close dropdown when clicking outside
+            window.addEventListener('click', (event) => {
+                if (!columnDropdown.contains(event.target) && event.target !== columnsBtn) {
+                    columnDropdown.classList.remove('show');
+                }
+            });
+
+            // Initial application
+            applyColumnVisibility();
+            
+            // Date formatting helpers
+            function isoToDMY(isoStr) {
+                if (!isoStr) return '';
+                const [year, month, day] = isoStr.split('-');
+                return `${day}/${month}/${year}`;
+            }
+
+            function dmyToISO(dmyStr) {
+                if (!dmyStr) return '';
+                const parts = dmyStr.split('/');
+                if (parts.length !== 3) return '';
+                const [day, month, year] = parts;
+                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            }
+
+            function sortData(data, columnIndex, order) {
+                const columnMap = {
+                    1: 'Action No.',
+                    2: 'ITSM Ticket',
+                    3: 'Crisis/Incident',
+                    4: 'Description',
+                    5: 'System',
+                    6: 'Owner',
+                    7: 'Action Status',
+                    8: 'Action Start Date',
+                    9: 'Start Time',
+                    10: 'Target Date',
+                    11: 'End Date',
+                    12: 'End Time',
+                    13: 'Age',
+                    14: 'Time to Acknowledge',
+                    15: 'Time to Recover',
+                    16: 'Time to Detect'
+                };
+
+                const key = columnMap[columnIndex];
+                if (!key) return data;
+
+                return data.sort((a, b) => {
+                    let valA = a[key] || '';
+                    let valB = b[key] || '';
+
+                    // Special handling for different types
+                    if (columnIndex === 1) { // Numeric ID / Incident No.
+                        const sA = valA.toString();
+                        const sB = valB.toString();
+                        return order === 'asc' 
+                            ? sA.localeCompare(sB, undefined, { numeric: true, sensitivity: 'base' })
+                            : sB.localeCompare(sA, undefined, { numeric: true, sensitivity: 'base' });
+                    }
+
+                    if ([8, 10, 11].includes(columnIndex)) { // Dates
+                        const dateA = parseDateUniversal(valA) || new Date(0);
+                        const dateB = parseDateUniversal(valB) || new Date(0);
+                        return order === 'asc' ? dateA - dateB : dateB - dateA;
+                    }
+
+                    if ([9, 12].includes(columnIndex)) { // Times (Start/End)
+                        const parseTime = (t) => {
+                            if (!t || t === 'N/A') return -1;
+                            let h = 0, m = 0;
+                            if (t.includes(' ')) {
+                                const [time, ampm] = t.split(' ');
+                                [h, m] = time.split(':').map(Number);
+                                if (ampm === 'PM' && h < 12) h += 12;
+                                if (ampm === 'AM' && h === 12) h = 0;
+                            } else {
+                                [h, m] = t.split(':').map(Number);
+                            }
+                            return h * 60 + m;
+                        };
+                        const tA = parseTime(valA);
+                        const tB = parseTime(valB);
+                        return order === 'asc' ? tA - tB : tB - tA;
+                    }
+
+                    if ([13, 14, 15, 16].includes(columnIndex)) { // Durations/Age
+                        const parseToMins = (str) => {
+                            if (!str || str === 'N/A') return -1;
+                            if (str.includes(':')) { // HH:MM format
+                                const [h, m] = str.split(':').map(Number);
+                                return h * 60 + m;
+                            }
+                            const dMatch = str.match(/(\d+)d/);
+                            const hMatch = str.match(/(\d+)h/);
+                            const mMatch = str.match(/(\d+)m/);
+                            let total = 0;
+                            if (dMatch) total += parseInt(dMatch[1]) * 1440;
+                            if (hMatch) total += parseInt(hMatch[1]) * 60;
+                            if (mMatch) total += parseInt(mMatch[1]);
+                            return total;
+                        };
+                        return order === 'asc' ? parseToMins(valA) - parseToMins(valB) : parseToMins(valB) - parseToMins(valA);
+                    }
+
+                    // Default string sort
+                    valA = valA.toString().toLowerCase();
+                    valB = valB.toString().toLowerCase();
+                    if (valA < valB) return order === 'asc' ? -1 : 1;
+                    if (valA > valB) return order === 'asc' ? 1 : -1;
+                    return 0;
+                });
+            }
+
+            function getCurrentTime() {
+                // Returns time in 24-hour format (HH:MM) for database storage
+                const now = new Date();
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                return `${hours}:${minutes}`;
+            }
+
+            function formatTimeAMPM(timeStr) {
+                if (!timeStr || timeStr === 'N/A' || timeStr === '') return 'N/A';
+                if (timeStr.includes('AM') || timeStr.includes('PM')) return timeStr;
+                
+                try {
+                    const parts = timeStr.split(':');
+                    if (parts.length < 2) return timeStr;
+                    const hours24 = parseInt(parts[0]);
+                    const minutes = parseInt(parts[1]);
+                    if (isNaN(hours24) || isNaN(minutes)) return timeStr;
+                    
+                    const ampm = hours24 >= 12 ? 'PM' : 'AM';
+                    let hours12 = hours24 % 12;
+                    hours12 = hours12 ? hours12 : 12;
+                    return `${String(hours12).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${ampm}`;
+                } catch (e) {
+                    return timeStr;
+                }
+            }
+
+            // Helper function to format dates for display (dd-mmm-yyyy)
+            // --- Helper Functions ---
+        function formatDuration(dd, hh, mm) {
+            let parts = [];
+            if (dd && dd > 0) parts.push(`${dd}d`);
+            if (hh && hh > 0) parts.push(`${hh}h`);
+            if (mm && mm > 0) parts.push(`${mm}m`);
+            return parts.length > 0 ? parts.join(' ') : 'N/A';
+        }
+
+        function parseDuration(durationStr) {
+            if (!durationStr || durationStr === 'N/A') return { dd: 0, hh: 0, mm: 0 };
+            
+            let dd = 0, hh = 0, mm = 0;
+            const dMatch = durationStr.match(/(\d+)d/);
+            const hMatch = durationStr.match(/(\d+)h/);
+            const mMatch = durationStr.match(/(\d+)m/);
+            
+            if (dMatch) dd = parseInt(dMatch[1]);
+            if (hMatch) hh = parseInt(hMatch[1]);
+            if (mMatch) mm = parseInt(mMatch[1]);
+            
+            return { dd, hh, mm };
+        }
+
+        const MONTH_ABBREVS = { jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, oct:9, nov:10, dec:11 };
+        const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+        function fixYear(y) {
+                if (y < 100) return y + 2000;
+                return y;
+            }
+
+        function parseDateUniversal(dateStr) {
+                if (!dateStr || dateStr === 'N/A') return null;
+                try {
+                    if (dateStr.includes('-')) {
+                        const parts = dateStr.split('-');
+                        const monthIdx = MONTH_ABBREVS[parts[1]?.toLowerCase()];
+                        if (monthIdx !== undefined) {
+                            const yr = fixYear(parseInt(parts[2]));
+                            const d = new Date(yr, monthIdx, parseInt(parts[0]));
+                            d.setFullYear(yr);
+                            return d;
+                        }
+                        const [y, m, dd] = parts.map(Number);
+                        if (y > 1000) return new Date(y, m - 1, dd);
+                        const yr = fixYear(y);
+                        const d = new Date(yr, m - 1, dd);
+                        d.setFullYear(yr);
+                        return d;
+                    } else if (dateStr.includes('/')) {
+                        const [dd, m, y] = dateStr.split('/').map(Number);
+                        const yr = fixYear(y);
+                        const d = new Date(yr, m - 1, dd);
+                        d.setFullYear(yr);
+                        return d;
+                    }
+                    return new Date(dateStr);
+                } catch (e) { return null; }
+            }
+
+        function formatDateForDisplay(dateStr) {
+                if (!dateStr || dateStr === 'N/A') return 'N/A';
+                const date = parseDateUniversal(dateStr);
+                if (!date || isNaN(date.getTime())) return dateStr;
+                const d = String(date.getDate()).padStart(2, '0');
+                const m = MONTH_NAMES[date.getMonth()];
+                const y = date.getFullYear();
+                return `${d}-${m}-${y}`;
+            }
+
+            const formatVal = (val) => (!val || val === '0m' || val === 'N/A') ? 'N/A' : val;
+
+            function setupDualDatePicker(displayId, hiddenId, onChange) {
+                const displayEl = typeof displayId === 'string' ? document.getElementById(displayId) : displayId;
+                const hiddenEl = typeof hiddenId === 'string' ? document.getElementById(hiddenId) : hiddenId;
+                if (!displayEl || !hiddenEl) return;
+
+                displayEl.addEventListener('click', () => {
+                    try {
+                        hiddenEl.showPicker();
+                    } catch (e) {
+                        hiddenEl.focus();
+                    }
+                });
+
+                hiddenEl.addEventListener('change', (e) => {
+                    const isoDate = e.target.value;
+                    displayEl.value = isoToDMY(isoDate);
+                    if (onChange) onChange(isoDate);
+                });
+
+                displayEl.addEventListener('change', (e) => {
+                    const dmyDate = e.target.value;
+                    if (!dmyDate) {
+                        hiddenEl.value = '';
+                        if (onChange) onChange('');
+                        return;
+                    }
+                    const isoDate = dmyToISO(dmyDate);
+                    if (isoDate && !isNaN(new Date(isoDate).getTime())) {
+                        hiddenEl.value = isoDate;
+                        if (onChange) onChange(isoDate);
+                    } else {
+                        displayEl.value = isoToDMY(hiddenEl.value);
+                    }
+                });
+            }
+
+            // Sync hidden picker with display
+            setupDualDatePicker(weekPickerDisplay, weekPickerHidden, (isoDate) => {
+                currentPage = 1; // Reset to first page when week changes
+                loadDashboardData(isoDate);
+            });
+
+            // Set initial date to today
+            const today = new Date();
+            const todayISO = today.toISOString().split('T')[0];
+            weekPickerHidden.value = todayISO;
+            weekPickerDisplay.value = isoToDMY(todayISO);
+            document.getElementById('current-date').textContent = today.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+
+            // --- Stat Card Filtering Logic ---
+            const statCards = {
+                'all': document.getElementById('stat-total'),
+                'open': document.getElementById('stat-open'),
+                'closed': document.getElementById('stat-closed')
+            };
+
+            Object.entries(statCards).forEach(([filterType, card]) => {
+                if (card) {
+                    card.addEventListener('click', () => {
+                        // If clicking the already active filter, we could either do nothing or toggle back to 'all'
+                        // Let's make it toggle: if active is clicked, reset to 'all' UNLESS 'all' was clicked
+                        if (currentStatusFilter === filterType && filterType !== 'all') {
+                            currentStatusFilter = 'all';
+                        } else {
+                            currentStatusFilter = filterType;
+                        }
+
+                        // Reset to first page when status filter changes
+                        currentPage = 1;
+
+                        // Update active class
+                        Object.values(statCards).forEach(c => c.classList.remove('active'));
+                        statCards[currentStatusFilter].classList.add('active');
+
+                        // Refresh UI
+                        updateDashboardUI(currentItems);
+                    });
+                }
+            });
+            
+            // Set initial active state
+            if (statCards['all']) statCards['all'].classList.add('active');
+
+            // Helper to determine if an action is closed (by status OR by end date)
+            function isItemClosed(item) {
+                const status = item['Action Status'] || '';
+                const endDate = item['End Date'] || '';
+                return status === 'Closed' || (endDate && endDate.trim() && endDate.toLowerCase() !== 'n/a');
+            }
+
+            // Helper to check if an item has started by a given week
+            function isItemStartedByWeek(item, targetYear, targetWeek) {
+                const startDateStr = item['Action Start Date'];
+                if (!startDateStr || startDateStr === 'N/A') return true;
+
+                try {
+                    const startDate = parseDateUniversal(startDateStr);
+                    if (!startDate || isNaN(startDate.getTime())) return true;
+
+                    // Calculate target week end (Saturday) - matches Python's %U logic
+                    const yearStart = new Date(targetYear, 0, 1);
+                    // Days until first Sunday: (7 - weekday) % 7
+                    // weekday: 0=Sun, 1=Mon, ..., 6=Sat
+                    const firstSundayOffset = (7 - yearStart.getDay()) % 7;
+                    const firstSunday = new Date(yearStart.getTime() + firstSundayOffset * 24 * 60 * 60 * 1000);
+
+                    let weekEnd;
+                    if (targetWeek === 0) {
+                        // Week 0 ends on Saturday before first Sunday
+                        weekEnd = new Date(firstSunday.getTime() - 24 * 60 * 60 * 1000);
+                    } else {
+                        // Week N ends on Saturday of that week
+                        weekEnd = new Date(firstSunday.getTime() + (targetWeek * 7 - 1) * 24 * 60 * 60 * 1000);
+                    }
+
+                    return startDate <= weekEnd;
+                } catch (e) {
+                    return true;
+                }
+            }
+
+            // Helper to check if an item has started by a given year (for Year mode)
+            function isItemStartedByYear(item, targetYear) {
+                const startDateStr = item['Action Start Date'];
+                if (!startDateStr || startDateStr === 'N/A') return true;
+
+                try {
+                    const startDate = parseDateUniversal(startDateStr);
+                    if (!startDate || isNaN(startDate.getTime())) return true;
+
+                    // Item has started if its start date is in the target year or earlier
+                    const yearEnd = new Date(targetYear, 11, 31, 23, 59, 59);
+                    return startDate <= yearEnd;
+                } catch (e) {
+                    return true;
+                }
+            }
+
+            // Function to get Sunday-based week number (matches Python's %U)
+            function getWeekNumber(date) {
+                // Clone the date to avoid modifying the original
+                const d = new Date(date.getTime());
+                
+                // Get the first day of the year
+                const yearStart = new Date(d.getFullYear(), 0, 1);
+                
+                // Python's %U treats Jan 1 as the start of Week 0, 
+                // and the first Sunday of the year starts Week 1.
+                // Days before the first Sunday are Week 0.
+                
+                // Calculate the number of days since Jan 1
+                const dayOfYear = Math.floor((d - yearStart) / (24 * 60 * 60 * 1000));
+                
+                // week = (dayOfYear + offset) / 7
+                // If Jan 1 is Sunday (0), offset is 0.
+                // If Jan 1 is Monday (1), offset is 1? No.
+                // If Jan 1 is Monday, then Jan 1 (day 0) should be week 0.
+                // Jan 7 (day 6, next Sunday) should be week 1.
+                // (6 + offset) / 7 = 1 => offset = 1. Wait.
+                
+                // Correct logic for %U:
+                // week = floor((dayOfYear + yearStart.getDay()) / 7)
+                // This ensures that the first Sunday (dayOfYear + yearStart.getDay() >= 7) starts week 1.
+                return Math.floor((dayOfYear + yearStart.getDay()) / 7);
+            }
+
+            // Function to get the date range of a week (Sunday to Saturday)
+            function getWeekRange(date) {
+                const d = new Date(date);
+                const day = d.getDay(); 
+                const sun = new Date(d);
+                sun.setDate(d.getDate() - day);
+                const sat = new Date(sun);
+                sat.setDate(sun.getDate() + 6);
+                
+                const options = { month: 'long', day: 'numeric' };
+                return `${sun.toLocaleDateString('en-GB', options)} - ${sat.toLocaleDateString('en-GB', { ...options, year: 'numeric' })}`;
+            }
+
+            async function loadDashboardData(dateStr, silent = false) {
+                // Parse dateStr (YYYY-MM-DD) carefully to avoid timezone shifts
+                const [year, month, day] = dateStr.split('-').map(Number);
+                const date = new Date(year, month - 1, day);
+                
+                currentYear = date.getFullYear();
+                currentWeek = getWeekNumber(date);
+                
+                if (!silent) {
+                    if (window.currentTimePeriod === 'Year') {
+                        reportingPeriod.textContent = `Current reporting period: Full Year ${currentYear}`;
+                    } else {
+                        reportingPeriod.textContent = `Current reporting period: ${getWeekRange(date)}`;
+                    }
+                    // Only clear details if not a silent background sync
+                    detailsContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 2rem;">Select an item from the table above to view details</div>';
+                }
+
+                try {
+                    allIncidentsAndCrises = []; // Clear old references
+                    // If we are in Action mode, we also want to fetch Incidents and Crises for references
+                    if (currentDataType === 'Action') {
+                        const [incRes, criRes] = await Promise.all([
+                            fetch(`/api/data?year=${currentYear}&week=${window.currentTimePeriod === 'Year' ? 'all' : currentWeek}&type=Incident`),
+                            fetch(`/api/data?year=${currentYear}&week=${window.currentTimePeriod === 'Year' ? 'all' : currentWeek}&type=Crisis`)
+                        ]);
+                        if (incRes.ok && criRes.ok) {
+                            const [incData, criData] = await Promise.all([incRes.json(), criRes.json()]);
+                            allIncidentsAndCrises = [
+                                ...(incData.items || []).map(a => ({ ...a, type: 'Incident' })),
+                                ...(criData.items || []).map(a => ({ ...a, type: 'Crisis' }))
+                            ];
+                            updateReferenceDropdown();
+                        }
+                    }
+
+                    const response = await fetch(`/api/data?year=${currentYear}&week=${window.currentTimePeriod === 'Year' ? 'all' : currentWeek}&type=${currentDataType}`);
+                    if (!response.ok) {
+                        if (response.status === 503) {
+                        }
+                        return;
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Only update if there's new data or it's a manual/initial load
+                    if (data.last_modified > lastSyncedTime || !silent) {
+                        lastSyncedTime = data.last_modified;
+                        currentItems = data.items || [];
+                        updateDashboardUI(currentItems);
+                        
+                        // If we have an active detail view, update its data if it hasn't changed locally
+                        const activeItemId = document.querySelector('.detail-title h3')?.getAttribute('data-id');
+                        if (activeItemId) {
+                            const updatedItem = currentItems.find(a => a['Action No.'] === activeItemId);
+                            const remarkItemText = document.getElementById('new-remark-action-text');
+                            if (updatedItem && (!remarkItemText || !remarkItemText.value.trim())) {
+                                showIncidentDetails(updatedItem);
+                            }
+                        }
+                    } else {
+                    }
+                } catch (error) {
+                    console.error('Error fetching dashboard data:', error);
+                }
+            }
+
+
+            function updateReferenceDropdown() {
+                const select = document.getElementById('new-reference');
+                if (!select) return;
+                
+                // Keep the first "None" option
+                select.innerHTML = '<option value="">None</option>';
+                
+                allIncidentsAndCrises.forEach(item => {
+                    const id = item['Action No.'];
+                    const title = item['Crisis/Incident'] || item['Description'] || 'No Title';
+                    const type = item.type;
+                    const option = document.createElement('option');
+                    option.value = id;
+                    option.textContent = `[${type}] ${id}: ${title.substring(0, 50)}${title.length > 50 ? '...' : ''}`;
+                    select.appendChild(option);
+                });
+            }
+
+            // --- Generic Edit Modal Helper ---
+            function showEditModal({ title, label, initialValue, type = 'text', onSave, onNow }) {
+                const modal = document.getElementById('edit-value-modal');
+                const titleEl = document.getElementById('edit-modal-title');
+                const labelEl = document.getElementById('edit-modal-label');
+                const inputEl = document.getElementById('edit-modal-input');
+                const dateContainer = document.getElementById('edit-modal-date-container');
+                const dateDisplayEl = document.getElementById('edit-modal-date-display');
+                const dateHiddenEl = document.getElementById('edit-modal-date-hidden');
+                const durationContainer = document.getElementById('edit-modal-duration-container');
+                const durationDD = document.getElementById('edit-duration-dd');
+                const durationHH = document.getElementById('edit-duration-hh');
+                const durationMM = document.getElementById('edit-duration-mm');
+                const textareaEl = document.getElementById('edit-modal-textarea');
+                const nowBtn = document.getElementById('edit-modal-now-btn');
+                const saveBtn = document.getElementById('edit-modal-save');
+                const cancelBtn = document.getElementById('cancel-edit-modal');
+                const closeBtn = document.getElementById('close-edit-modal');
+
+                titleEl.textContent = title;
+                labelEl.textContent = label;
+
+                // Hide all inputs first
+                inputEl.style.display = 'none';
+                dateContainer.style.display = 'none';
+                durationContainer.style.display = 'none';
+                textareaEl.style.display = 'none';
+                nowBtn.style.display = 'none';
+
+                let activeInput;
+                if (type === 'date') {
+                    dateContainer.style.display = 'block';
+                    dateHiddenEl.value = initialValue;
+                    dateDisplayEl.value = isoToDMY(initialValue);
+                    
+                    // Setup dual picker logic (remove old listeners if any, or just ensure they are there)
+                    // Since IDs are static, we can just set it up once or here
+                    setupDualDatePicker(dateDisplayEl, dateHiddenEl);
+                    
+                    activeInput = dateHiddenEl;
+                } else if (type === 'duration') {
+                    durationContainer.style.display = 'block';
+                    const { dd, hh, mm } = parseDuration(initialValue);
+                    durationDD.value = dd || '';
+                    durationHH.value = hh || '';
+                    durationMM.value = mm || '';
+                    activeInput = durationDD; // Focus on days first
+                } else if (type === 'textarea') {
+                    textareaEl.style.display = 'block';
+                    textareaEl.value = initialValue;
+                    activeInput = textareaEl;
+                } else if (type === 'time') {
+                    inputEl.style.display = 'block';
+                    inputEl.type = 'time';
+                    inputEl.value = initialValue;
+                    nowBtn.style.display = 'block';
+                    activeInput = inputEl;
+                } else {
+                    inputEl.style.display = 'block';
+                    inputEl.type = 'text';
+                    inputEl.value = initialValue;
+                    activeInput = inputEl;
+                }
+
+                const closeModal = () => {
+                    modal.style.display = 'none';
+                    saveBtn.onclick = null;
+                    nowBtn.onclick = null;
+                };
+
+                saveBtn.onclick = () => {
+                    let newValue;
+                    if (type === 'duration') {
+                        newValue = formatDuration(
+                            parseInt(durationDD.value) || 0,
+                            parseInt(durationHH.value) || 0,
+                            parseInt(durationMM.value) || 0
+                        );
+                    } else {
+                        newValue = activeInput.value;
+                    }
+                    onSave(newValue);
+                    closeModal();
+                };
+
+                nowBtn.onclick = () => {
+                    if (onNow) onNow();
+                };
+
+                cancelBtn.onclick = closeModal;
+                closeBtn.onclick = closeModal;
+
+                modal.style.display = 'block';
+                setTimeout(() => activeInput.focus(), 100);
+            }
+
+            async function showNotificationModal({ title = 'Notification', message, type = 'alert', importData = null }) {
+                return new Promise((resolve) => {
+                    const modal = document.getElementById('notification-modal');
+                    const titleEl = document.getElementById('notification-title');
+                    const messageEl = document.getElementById('notification-message');
+                    const progressContainer = document.getElementById('notification-progress-container');
+                    const confirmBtn = document.getElementById('notification-confirm');
+                    const cancelBtn = document.getElementById('notification-cancel');
+                    const closeBtn = document.getElementById('notification-close');
+
+                    titleEl.textContent = title;
+                    
+                    // Support multi-line messages using <br> or \n
+                    if (message.includes('\n')) {
+                        messageEl.innerHTML = message.replace(/\n/g, '<br>');
+                    } else {
+                        messageEl.textContent = message;
+                    }
+                    
+                    if (importData) {
+                        progressContainer.style.display = 'block';
+                        const total = (importData.new || 0) + (importData.updated || 0) + (importData.skipped || 0) + (importData.errors || 0);
+                        if (total > 0) {
+                            document.getElementById('progress-new').style.width = `${(importData.new / total) * 100}%`;
+                            document.getElementById('progress-updated').style.width = `${(importData.updated / total) * 100}%`;
+                            document.getElementById('progress-skipped').style.width = `${(importData.skipped / total) * 100}%`;
+                            document.getElementById('progress-errors').style.width = `${(importData.errors / total) * 100}%`;
+                        } else {
+                            document.getElementById('progress-new').style.width = '0%';
+                            document.getElementById('progress-updated').style.width = '0%';
+                            document.getElementById('progress-skipped').style.width = '0%';
+                            document.getElementById('progress-errors').style.width = '0%';
+                        }
+                    } else {
+                        progressContainer.style.display = 'none';
+                    }
+
+                    if (type === 'confirm') {
+                        cancelBtn.style.display = 'block';
+                        confirmBtn.textContent = 'Confirm';
+                    } else {
+                        cancelBtn.style.display = 'none';
+                        confirmBtn.textContent = 'OK';
+                    }
+
+                    const cleanup = (result) => {
+                        modal.style.display = 'none';
+                        resolve(result);
+                    };
+
+                    confirmBtn.onclick = () => cleanup(true);
+                    cancelBtn.onclick = () => cleanup(false);
+                    closeBtn.onclick = () => cleanup(false);
+
+                    modal.style.display = 'block';
+                });
+            }
+
+            function startLiveSync() {
+                if (isPolling) return;
+                isPolling = true;
+                
+                const poll = async () => {
+                    if (weekPickerHidden.value) {
+                        await loadDashboardData(weekPickerHidden.value, true);
+                    }
+                    setTimeout(poll, 3000); // Poll every 3 seconds
+                };
+                
+                poll();
+            }
+
+            function updateDashboardUI(items) {
+                // Initialize hidden rows from database
+                hiddenRows = new Set();
+                hiddenRows = new Set();
+                items.forEach(item => {
+                    if (item.hidden) {
+                        hiddenRows.add(item['Action No.']);
+                    }
+                });
+
+                const searchVal = document.getElementById('table-search')?.value.toLowerCase() || '';
+                
+                let plural;
+                if (currentDataType === 'Crisis') plural = 'Crises';
+                else if (currentDataType === 'Action') plural = 'Action Items';
+                else plural = 'Incidents';
+
+                // 1. Filter out items based on current period mode
+                const isYearMode = window.currentTimePeriod === 'Year';
+                const displayItemsFull = items.filter(item => {
+                    const itemClosed = isItemClosed(item);
+                    if (isYearMode) {
+                        // Year mode: item must have started by end of current year
+                        if (!isItemStartedByYear(item, currentYear)) return false;
+
+                        // For closed items in Year mode, show all closed in current year
+                        if (!itemClosed) return true;
+
+                        const endDateStr = item['End Date'];
+                        if (!endDateStr || endDateStr === 'N/A') return true;
+
+                        try {
+                            const date = parseDateUniversal(endDateStr);
+                            if (!date || isNaN(date.getTime())) return true;
+                            const endYear = date.getFullYear();
+                            // Show all closed items from current year
+                            return endYear === currentYear;
+                        } catch (e) {
+                            return true;
+                        }
+                    } else {
+                        // Week mode: item must have started by this week
+                        if (!isItemStartedByWeek(item, currentYear, currentWeek)) return false;
+
+                        // Second check: if closed, only show if closed in current week
+                        if (!itemClosed) return true;
+
+                        const endDateStr = item['End Date'];
+                        if (!endDateStr || endDateStr === 'N/A') return true;
+
+                        try {
+                            const date = parseDateUniversal(endDateStr);
+                            if (!date || isNaN(date.getTime())) return true;
+
+                            const endWeek = getWeekNumber(date);
+                            const endYear = date.getFullYear();
+
+                            // Only show closed items if they were closed in the CURRENTLY VIEWED week/year
+                            return endYear === currentYear && endWeek === currentWeek;
+                        } catch (e) {
+                            return true; // Show if date is unparseable
+                        }
+                    }
+                });
+
+                // 2. Apply status and search filters
+                const filteredItems = displayItemsFull.filter(item => {
+                    // Frontend hidden filter
+                    if (hiddenRows.has(item['Action No.'])) return false;
+
+                    // Status Filter
+                    if (currentStatusFilter === 'open' && isItemClosed(item)) return false;
+                    if (currentStatusFilter === 'closed' && !isItemClosed(item)) return false;
+
+                    // Search Filter
+                    if (!searchVal) return true;
+                    
+                    const searchableText = [
+                        item['Action No.'],
+                        item['Crisis/Incident'],
+                        item['System'],
+                        item['Owner'],
+                        item['Action Status'],
+                        item['Crisis Reference'] || ''
+                    ].join(' ').toLowerCase();
+                    return searchableText.includes(searchVal);
+                });
+
+                // 2.5 Apply Sorting
+                sortData(filteredItems, currentSortColumn, currentSortOrder);
+
+                // Sync displayItems for navigation
+                displayItems = filteredItems;
+
+                // 3. Update Stats based on relevant items for this week
+                const total = displayItemsFull.length;
+                const closedCount = displayItemsFull.filter(a => isItemClosed(a) && !hiddenRows.has(a['Action No.'])).length;
+                const openCount = displayItemsFull.filter(a => !isItemClosed(a) && !hiddenRows.has(a['Action No.'])).length;
+
+                document.querySelector('#stat-total .stat-value').textContent = openCount + closedCount;
+                document.querySelector('.stat-card.open .stat-value').textContent = openCount;
+                document.querySelector('.stat-card.closed .stat-value').textContent = closedCount;
+
+                // 4. Pagination Logic
+                const rowLimitSelect = document.getElementById('row-limit');
+                const pageSizeValue = rowLimitSelect ? rowLimitSelect.value : 'all';
+                const pageSize = pageSizeValue === 'all' ? filteredItems.length : parseInt(pageSizeValue);
+                const totalPages = pageSize > 0 ? Math.ceil(filteredItems.length / pageSize) : 1;
+                
+                // Ensure currentPage is within valid bounds
+                if (currentPage < 1) currentPage = 1;
+                if (currentPage > totalPages) currentPage = totalPages;
+                if (totalPages === 0) currentPage = 1;
+                
+                // Calculate slice indices for current page
+                const startIndex = (currentPage - 1) * pageSize;
+                const endIndex = startIndex + pageSize;
+                const paginatedItems = filteredItems.slice(startIndex, endIndex);
+                
+                // Update pagination UI
+                const prevPageBtn = document.getElementById('prev-page');
+                const nextPageBtn = document.getElementById('next-page');
+                const currentPageSpan = document.getElementById('current-page');
+                const totalPagesSpan = document.getElementById('total-pages');
+                
+                if (currentPageSpan) currentPageSpan.textContent = totalPages === 0 ? 0 : currentPage;
+                if (totalPagesSpan) totalPagesSpan.textContent = totalPages;
+                if (prevPageBtn) prevPageBtn.disabled = currentPage <= 1;
+                if (nextPageBtn) nextPageBtn.disabled = currentPage >= totalPages || totalPages === 0;
+
+                // Update Table
+                const tbody = document.querySelector('tbody');
+                tbody.innerHTML = '';
+
+                if (filteredItems.length === 0) {
+                    const msg = searchVal ? `No ${plural.toLowerCase()} match your search` : `No ${plural.toLowerCase()} found for this period`;
+                    tbody.innerHTML = `<tr><td colspan="${visibleColumns.length}" style="text-align: center; padding: 2rem;">${msg}</td></tr>`;
+                    return;
+                }
+
+                paginatedItems.forEach(item => {
+                    const tr = document.createElement('tr');
+                    const isClosed = isItemClosed(item);
+                    const statusText = isClosed ? 'Closed' : (item['Action Status'] || 'Open');
+                    const statusClass = statusText.toLowerCase().replace(/\s+/g, '-');
+                    
+                    const agingVal = item['Aging'] || '0';
+                    const agingNum = parseInt(agingVal.replace(/[^0-9-]/g, '')) || 0;
+                    const agingClass = agingNum > 7 ? 'urgent' : (agingNum > 0 ? 'warning' : '');
+
+                    const endDate = item['End Date'] && item['End Date'].trim() ? item['End Date'] : 'N/A';
+                    
+                    // Calculate Age with Time precision
+                    let ageDisplay = '0';
+                    const startDateRaw = item['Action Start Date'];
+                    const startTimeRaw = item['Start Time'];
+                    
+                    if (startDateRaw && startDateRaw !== 'N/A') {
+                        let start, end;
+                        
+                        // Parse start date and time safely
+                        start = parseDateUniversal(startDateRaw);
+                        if (start && !isNaN(start.getTime())) {
+                            // Handle both 24h and AM/PM formats
+                            let hh = 0, mm = 0;
+                            if (startTimeRaw && startTimeRaw.includes(' ')) {
+                                const [timePart, ampm] = startTimeRaw.split(' ');
+                                [hh, mm] = timePart.split(':').map(Number);
+                                if (ampm === 'PM' && hh < 12) hh += 12;
+                                if (ampm === 'AM' && hh === 12) hh = 0;
+                            } else {
+                                [hh, mm] = (startTimeRaw || '00:00').split(':').map(Number);
+                            }
+                            start.setHours(hh || 0, mm || 0, 0, 0);
+                        }
+
+                        // Parse end date and time safely
+                        if (isClosed) {
+                            const endDateRaw = item['End Date'];
+                            const endTimeRaw = item['End Time'];
+                            end = parseDateUniversal(endDateRaw);
+                            if (end && !isNaN(end.getTime())) {
+                                let hh = 0, mm = 0;
+                                if (endTimeRaw && endTimeRaw.includes(' ')) {
+                                    const [timePart, ampm] = endTimeRaw.split(' ');
+                                    [hh, mm] = timePart.split(':').map(Number);
+                                    if (ampm === 'PM' && hh < 12) hh += 12;
+                                    if (ampm === 'AM' && hh === 12) hh = 0;
+                                } else {
+                                    [hh, mm] = (endTimeRaw || '00:00').split(':').map(Number);
+                                }
+                                end.setHours(hh || 0, mm || 0, 0, 0);
+                            }
+                        } else {
+                            end = new Date();
+                        }
+                        
+                        if (start && !isNaN(start.getTime()) && end && !isNaN(end.getTime())) {
+                            const diffMs = end - start;
+                            const diffMins = Math.floor(diffMs / (1000 * 60));
+                            
+                            if (diffMins < 0) {
+                                ageDisplay = '0';
+                            } else if (diffMins < 1440) { // Less than 24 hours
+                                const hh = Math.floor(diffMins / 60);
+                                const mm = diffMins % 60;
+                                ageDisplay = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+                            } else {
+                                const days = Math.floor(diffMins / 1440);
+                                ageDisplay = `${days}d`;
+                            }
+                        }
+                    }
+                    item['Age'] = ageDisplay;
+
+                    // Reference info
+                    let titleDisplay = item['Crisis/Incident'] || 'N/A';
+                    if (currentDataType === 'Action' && item['Crisis Reference']) {
+                        const refId = item['Crisis Reference'];
+                        const refItem = allIncidentsAndCrises.find(i => i['Action No.'] === refId);
+                        if (refItem) {
+                            const refTitle = refItem['Crisis/Incident'] || refItem['Description'] || 'No Title';
+                            titleDisplay = `<span style="color: var(--primary); font-weight: 600;">[Ref: ${refId}]</span> ${titleDisplay}<br><small style="color: var(--text-muted);">${refTitle.substring(0, 60)}${refTitle.length > 60 ? '...' : ''}</small>`;
+                        } else {
+                            titleDisplay = `<span style="color: var(--primary); font-weight: 600;">[Ref: ${refId}]</span> ${titleDisplay}`;
+                        }
+                    }
+
+                    tr.innerHTML = `
+                        <td style="text-align: center;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hide-row-icon" title="Hide row from view">
+                                <path d="M9.88 9.88L2 2m7.88 7.88L12 12m-2.12-2.12L12 12m0 0l2.12 2.12M12 12l2.12 2.12M12 12l7.88 7.88M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"></path>
+                                <line x1="2" y1="2" x2="22" y2="22"></line>
+                            </svg>
+                        </td>
+                        <td data-id="${item['Action No.'] || ''}">${item['Action No.'] || 'N/A'}</td>
+                        <td>${item['ITSM Ticket'] || 'N/A'}</td>
+                        <td>${titleDisplay}</td>
+                        <td>${item['Description'] || 'N/A'}</td>
+                        <td>${item['System'] || 'N/A'}</td>
+                        <td>${item['Owner'] || 'N/A'}</td>
+                        <td><span class="status status-${statusClass}">${statusText}</span></td>
+                        <td>${formatDateForDisplay(item['Action Start Date'])}</td>
+                        <td>${formatTimeAMPM(item['Start Time'])}</td>
+                        <td>${formatDateForDisplay(item['Target Date'])}</td>
+                        <td>${formatDateForDisplay(endDate)}</td>
+                        <td>${formatTimeAMPM(item['End Time'])}</td>
+                        <td class="age-column ${!isClosed ? 'urgent' : ''}">${ageDisplay}</td>
+                        <td>${formatVal(item['Time to Acknowledge'])}</td>
+                        <td>${formatVal(item['Time to Recover'])}</td>
+                        <td>${formatVal(item['Time to Detect'])}</td>
+                    `;
+                    
+                    // Re-highlight if this was the selected row
+                    const activeItemId = document.querySelector('.detail-title h3')?.getAttribute('data-id');
+                    if (activeItemId === item['Action No.']) {
+                        tr.style.backgroundColor = 'var(--hover-bg)';
+                    }
+                    
+                    tr.addEventListener('click', (e) => {
+                        // Don't show details if clicking the hide icon
+                        if (e.target.closest('.hide-row-icon')) {
+                            e.stopPropagation();
+                            const itemNo = item['Action No.'];
+                            hiddenRows.add(itemNo);
+                            
+                            // Save to database
+                            fetch('/api/hide-row', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    action_no: itemNo,
+                                    type: currentDataType,
+                                    hidden: 1
+                                })
+                            }).catch(err => console.error('Error hiding row:', err));
+
+                            updateDashboardUI(currentItems);
+                            return;
+                        }
+
+                        // Highlight selected row
+                        document.querySelectorAll('tbody tr').forEach(r => r.style.backgroundColor = '');
+                        tr.style.backgroundColor = 'var(--hover-bg)';
+                        showIncidentDetails(item);
+                    });
+
+                    tbody.appendChild(tr);
+                });
+
+                // Re-apply column visibility after re-rendering table rows
+                if (typeof applyColumnVisibility === 'function') {
+                    applyColumnVisibility();
+                }
+
+                // Update sort indicators on headers
+                const tableHeaders = document.querySelectorAll('thead th');
+                tableHeaders.forEach(th => {
+                    const colIndex = parseInt(th.getAttribute('data-column'));
+                    th.classList.remove('sort-asc', 'sort-desc');
+                    if (colIndex === currentSortColumn) {
+                        th.classList.add(currentSortOrder === 'asc' ? 'sort-asc' : 'sort-desc');
+                    }
+                });
+            }
+
+            function showIncidentDetails(item) {
+                const actionNo = item['Action No.'];
+                const incidentName = item['Crisis/Incident'] || 'N/A';
+                const systemName = item['System'] || 'N/A';
+                const ownerName = item['Owner'] || 'N/A';
+                const currentStatus = item['Action Status'] || 'Unknown';
+                
+                // --- Navigation Logic ---
+                const currentIndex = displayItems.findIndex(a => a['Action No.'] === actionNo);
+                const prevBtn = document.getElementById('prev-incident');
+                const nextBtn = document.getElementById('next-incident');
+                const navCount = document.getElementById('nav-count');
+
+                if (navCount) {
+                    navCount.textContent = `${currentIndex + 1} of ${displayItems.length}`;
+                }
+
+                if (prevBtn) {
+                    prevBtn.disabled = currentIndex <= 0;
+                    prevBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        if (currentIndex > 0) {
+                            showIncidentDetails(displayItems[currentIndex - 1]);
+                        }
+                    };
+                }
+
+                if (nextBtn) {
+                    nextBtn.disabled = currentIndex >= displayItems.length - 1 || currentIndex === -1;
+                    nextBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        if (currentIndex < displayItems.length - 1) {
+                            showIncidentDetails(displayItems[currentIndex + 1]);
+                        }
+                    };
+                }
+                
+                // Helper function to convert date to ISO format (YYYY-MM-DD)
+                function dateToISO(dateStr) {
+                    if (!dateStr || dateStr === 'N/A') return '';
+                    const date = parseDateUniversal(dateStr);
+                    if (date && !isNaN(date.getTime())) {
+                        return date.toISOString().split('T')[0];
+                    }
+                    return dateStr;
+                }
+                
+                // Tab state management for Remarks/Actions slider
+                let currentRemarksActionsTab = 'remarks'; // 'remarks' or 'actions'
+                
+                // Load remarks from the Remarks field (CRLF/LF separated list)
+                // We split by newline ONLY if it is followed by a date in [DD/MM/YYYY] format
+                // This ensures multi-line remarks stay together as a single entry.
+                let remarksData = (item['Remarks'] || '').split(/\r?\n(?=\[\d{2}\/\d{2}\/\d{4}\])/).filter(r => r.trim());
+
+                // Sort remarks by date (newest first)
+                remarksData.sort((a, b) => {
+                    const dateA = a.match(/^\[(\d{2})\/(\d{2})\/(\d{4})\]/);
+                    const dateB = b.match(/^\[(\d{2})\/(\d{2})\/(\d{4})\]/);
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    const d1 = new Date(dateA[3], dateA[2] - 1, dateA[1]);
+                    const d2 = new Date(dateB[3], dateB[2] - 1, dateB[1]);
+                    return d2 - d1;
+                });
+                item['Remarks'] = remarksData.join('\r\n');
+
+                // Load actions from the Actions field (same format as remarks)
+                let actionsData = (item['Actions'] || '').split(/\r?\n(?=\[\d{2}\/\d{2}\/\d{4}\])/).filter(a => a.trim());
+
+                // Sort actions by date (newest first)
+                actionsData.sort((a, b) => {
+                    const dateA = a.match(/^\[(\d{2})\/(\d{2})\/(\d{4})\]/);
+                    const dateB = b.match(/^\[(\d{2})\/(\d{2})\/(\d{4})\]/);
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    const d1 = new Date(dateA[3], dateA[2] - 1, dateA[1]);
+                    const d2 = new Date(dateB[3], dateB[2] - 1, dateB[1]);
+                    return d2 - d1;
+                });
+                item['Actions'] = actionsData.join('\r\n');
+
+                function renderRemarks() {
+                    if (remarksData.length === 0) {
+                        return '<div class="detail-value">No remarks available.</div>';
+                    }
+                    return `
+                        <div class="remarks-list">
+                            ${remarksData.map((remark, index) => {
+                                // Extract date if it exists in [DD/MM/YYYY] format
+                                // Use [\s\S]* to capture multiple lines in the text portion
+                                const dateMatch = remark.match(/^\[(\d{2}\/\d{2}\/\d{4})\]\s*([\s\S]*)/);
+                                const dateStr = dateMatch ? dateMatch[1] : '';
+                                const textOnly = dateMatch ? dateMatch[2] : remark;
+                                
+                                return `
+                                    <div class="remark-entry">
+                                        <div class="remark-items">
+                                            <span class="remark-action-btn edit" data-index="${index}" data-type="remark" title="Edit Remark">✎</span>
+                                            <span class="remark-action-btn delete" data-index="${index}" data-type="remark" title="Delete Remark">🗑</span>
+                                        </div>
+                                        ${dateStr ? `<div class="remark-date">${dateStr}</div>` : ''}
+                                        <div class="remark-text">${textOnly}</div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                }
+
+                function renderActions() {
+                    if (actionsData.length === 0) {
+                        return '<div class="detail-value">No actions available.</div>';
+                    }
+                    return `
+                        <div class="remarks-list">
+                            ${actionsData.map((actionItem, index) => {
+                                // Extract date, assignee, and closed status if they exist
+                                // Format: [DD/MM/YYYY] [Assignee] [CLOSED] Text
+                                const match = actionItem.match(/^\[(\d{2}\/\d{2}\/\d{4})\]\s*(?:\[([^\]]+)\])?\s*(\[CLOSED\])?\s*([\s\S]*)/);
+                                const dateStr = match ? match[1] : '';
+                                const assignee = match ? match[2] : '';
+                                const isItemClosed = !!match[3];
+                                const textOnly = match ? match[4] : actionItem;
+                                
+                                return `
+                                    <div class="remark-entry ${isItemClosed ? 'closed' : ''}">
+                                        <div class="remark-items">
+                                            <div class="action-toggle-row">
+                                                <strong>Status:</strong>
+                                                <label class="switch small" title="${isItemClosed ? 'Mark as Open' : 'Mark as Closed'}">
+                                                    <input type="checkbox" class="action-item-toggle" data-index="${index}" ${isItemClosed ? 'checked' : ''}>
+                                                    <span class="slider"></span>
+                                                </label>
+                                                <span class="toggle-label" style="color: ${isItemClosed ? 'var(--primary)' : 'var(--brand-red)'}">${isItemClosed ? 'CLOSED' : 'OPEN'}</span>
+                                            </div>
+                                            <span class="remark-action-btn edit" data-index="${index}" data-type="action" title="Edit Action">✎</span>
+                                            <span class="remark-action-btn delete" data-index="${index}" data-type="action" title="Delete Action">🗑</span>
+                                        </div>
+                                        <div class="remark-meta-row">
+                                            ${dateStr ? `<div class="remark-date">${dateStr}</div>` : ''}
+                                            ${assignee ? `<div class="remark-assignee">Assigned to: <span class="remark-assignee-name">${assignee}</span></div>` : ''}
+                                        </div>
+                                        <div class="remark-text">${textOnly}</div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                }
+
+                function updateDetailsUI() {
+                    const today = new Date().toISOString().split('T')[0];
+                    
+                    let singular;
+                    if (currentDataType === 'Crisis') singular = 'Crisis';
+                    else if (currentDataType === 'Action') singular = 'Action Item';
+                    else singular = 'Incident';
+
+                    // Refresh remarksData from item to ensure consistency
+                    // We split by newline ONLY if it is followed by a date in [DD/MM/YYYY] format
+                    remarksData = (item['Remarks'] || '').split(/\r?\n(?=\[\d{2}\/\d{2}\/\d{4}\])/).filter(r => r.trim());
+
+                    // Sort remarks by date (newest first)
+                    remarksData.sort((a, b) => {
+                        const dateA = a.match(/^\[(\d{2})\/(\d{2})\/(\d{4})\]/);
+                        const dateB = b.match(/^\[(\d{2})\/(\d{2})\/(\d{4})\]/);
+                        if (!dateA && !dateB) return 0;
+                        if (!dateA) return 1;
+                        if (!dateB) return -1;
+                        const d1 = new Date(dateA[3], dateA[2] - 1, dateA[1]);
+                        const d2 = new Date(dateB[3], dateB[2] - 1, dateB[1]);
+                        return d2 - d1;
+                    });
+                    item['Remarks'] = remarksData.join('\r\n');
+
+                // Refresh actionsData from item to ensure consistency
+                actionsData = (item['Actions'] || '').split(/\r?\n(?=\[\d{2}\/\d{2}\/\d{4}\])/).filter(a => a.trim());
+
+                // Sort actions by date (newest first)
+                actionsData.sort((a, b) => {
+                    const dateA = a.match(/^\[(\d{2})\/(\d{2})\/(\d{4})\]/);
+                    const dateB = b.match(/^\[(\d{2})\/(\d{2})\/(\d{4})\]/);
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    const d1 = new Date(dateA[3], dateA[2] - 1, dateA[1]);
+                    const d2 = new Date(dateB[3], dateB[2] - 1, dateB[1]);
+                    return d2 - d1;
+                });
+                item['Actions'] = actionsData.join('\r\n');
+
+                    // Read all values directly from item object to ensure we have the latest data
+                    const currentActionNo = item['Action No.'] || 'N/A';
+                    const currentIncidentName = item['Crisis/Incident'] || 'N/A';
+                    const currentIncidentField = 'Crisis/Incident';
+                    const currentSystemName = item['System'] || 'N/A';
+                    const currentOwnerName = item['Owner'] || 'N/A';
+                    const isClosed = isItemClosed(item);
+                    const currentStatusValue = isClosed ? 'Closed' : (item['Action Status'] || 'Open');
+                    
+                    // Get date values and format for display
+                    const startDateRaw = item['Action Start Date'] || 'N/A';
+                    const targetDateRaw = item['Target Date'] || 'N/A';
+                    const startDateDisplay = formatDateForDisplay(startDateRaw);
+                    const targetDateDisplay = formatDateForDisplay(targetDateRaw);
+                    
+                    // Check if user is currently typing to avoid overwriting their work
+                    const existingRemark = document.getElementById('new-remark-action-text')?.value || '';
+                    
+                    detailsContainer.innerHTML = `
+                        <div class="detail-header">
+                            <div class="detail-title-row">
+                                <h3 data-id="${currentActionNo}">
+                                    <span class="editable-value" data-field="${currentIncidentField}">${currentIncidentName}</span>
+                                    <span class="edit-icon" title="Edit ${currentIncidentField}">✎</span>
+                                </h3>
+                                <div class="status-toggle-container">
+                                    <strong>Status:</strong>
+                                    <label class="switch">
+                                        <input type="checkbox" id="status-checkbox" ${isClosed ? 'checked' : ''}>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <span id="status-toggle-label" class="toggle-label" style="color: ${isClosed ? '#10b981' : '#ef4444'}">${currentStatusValue.toUpperCase()}</span>
+                                </div>
+                            </div>
+                            <div class="detail-meta">
+                                <span><strong>${singular} No:</strong> <span class="editable-value" data-field="Action No.">${currentActionNo}</span><span class="edit-icon" title="Edit ${singular} No">✎</span></span>
+                                <span><strong>ITSM Ticket:</strong> <span class="editable-value" data-field="ITSM Ticket">${item['ITSM Ticket'] || 'N/A'}</span><span class="edit-icon" title="Edit ITSM Ticket">✎</span></span>
+                                <span><strong>System:</strong> <span class="editable-value" data-field="System">${currentSystemName}</span><span class="edit-icon" title="Edit System">✎</span></span>
+                                <span><strong>Owner:</strong> <span class="editable-value" data-field="Owner">${currentOwnerName}</span><span class="edit-icon" title="Edit Owner">✎</span></span>
+                                <span><strong>Start Date:</strong> <span class="editable-value" data-field="Action Start Date" data-is-date="true">${startDateDisplay}</span><span class="edit-icon" title="Edit Start Date">✎</span></span>
+                                <span><strong>Start Time:</strong> <span class="editable-value" data-field="Start Time" data-is-time="true">${formatTimeAMPM(item['Start Time'])}</span><span class="edit-icon" title="Edit Start Time">✎</span></span>
+                                <span><strong>Target Date:</strong> <span class="editable-value" data-field="Target Date" data-is-date="true">${targetDateDisplay}</span><span class="edit-icon" title="Edit Target Date">✎</span></span>
+                                <span><strong>Closure Date:</strong> <span id="detail-closure-date" class="editable-value" data-field="End Date" data-is-date="true">${formatDateForDisplay(item['End Date'])}</span><span class="edit-icon" title="Edit Closure Date">✎</span></span>
+                                <span><strong>End Time:</strong> <span id="detail-end-time" class="editable-value" data-field="End Time" data-is-time="true">${formatTimeAMPM(item['End Time'])}</span><span class="edit-icon" title="Edit End Time">✎</span></span>
+                                <span><strong>TTA:</strong> <span class="editable-value" data-field="Time to Acknowledge">${formatVal(item['Time to Acknowledge'])}</span><span class="edit-icon" title="Edit TTA">✎</span></span>
+                                <span><strong>TTR:</strong> <span class="editable-value" data-field="Time to Recover">${formatVal(item['Time to Recover'])}</span><span class="edit-icon" title="Edit TTR">✎</span></span>
+                                <span><strong>TTD:</strong> <span class="editable-value" data-field="Time to Detect">${formatVal(item['Time to Detect'])}</span><span class="edit-icon" title="Edit TTD">✎</span></span>
+                            </div>
+                        </div>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <div class="detail-label">Description</div>
+                                <div class="description-box">
+                                    <span class="remark-text editable-value" data-field="Description" data-type="textarea">${item['Description'] || 'No description provided.'}</span>
+                                    <span class="edit-icon" title="Edit Description">✎</span>
+                                </div>
+                            </div>
+                            <div class="detail-item" style="margin-top: 2rem;">
+                                <div style="display: flex; align-items: baseline; position: relative; margin-bottom: 1rem;">
+                                    <div class="detail-label" style="margin-bottom: 0; line-height: 45px;">${currentRemarksActionsTab === 'remarks' ? 'Current Remarks & Status Updates' : 'Current Actions & Tasks'}</div>
+                                    <div class="type-selector" style="position: absolute; left: 50%; transform: translateX(-50%); margin: 0; top: -45px;">
+                                        <div class="segmented-control">
+                                            <input type="radio" name="remarks-actions-tab" id="tab-remarks" value="remarks" ${currentRemarksActionsTab === 'remarks' ? 'checked' : ''}>
+                                            <label for="tab-remarks">Remarks</label>
+                                            <input type="radio" name="remarks-actions-tab" id="tab-items" value="actions" ${currentRemarksActionsTab === 'actions' ? 'checked' : ''}>
+                                            <label for="tab-items">Actions</label>
+                                            <div class="selection-slider remarks-actions-slider"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="remarks-actions-container">
+                                    ${currentRemarksActionsTab === 'remarks' ? renderRemarks() : renderActions()}
+                                </div>
+                                
+                                <div class="add-remark-form">
+                                    <div class="detail-label">${currentRemarksActionsTab === 'remarks' ? 'Add New Remark' : 'Add New Action'}</div>
+                                    <div class="form-group">
+                                        <textarea id="new-remark-action-text" class="form-control" placeholder="${currentRemarksActionsTab === 'remarks' ? 'Type your update here...' : 'Type your action here...'}"></textarea>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label class="form-label" for="remark-action-date-display">Date</label>
+                                            <div style="position: relative;">
+                                                <input type="text" id="remark-action-date-display" class="form-control" value="${isoToDMY(today)}">
+                                                <input type="date" id="remark-action-date-hidden" value="${today}" style="position: absolute; top: 0; left: 0; opacity: 0; width: 100%; height: 100%; pointer-events: none;">
+                                            </div>
+                                        </div>
+                                        <div class="form-group" id="action-assignee-group" style="display: ${currentRemarksActionsTab === 'actions' ? 'block' : 'none'}; flex: 1;">
+                                            <label class="form-label" for="remark-action-assignee">Assigned To</label>
+                                            <input type="text" id="remark-action-assignee" class="form-control" placeholder="Assignee name" value="">
+                                        </div>
+                                        <div class="form-group" style="flex: 2; display: flex; gap: 0.5rem; align-items: flex-end;">
+                                            <button id="add-remark-action-btn" class="btn btn-primary" style="flex: 1;">
+                                                <span>✚</span> ${currentRemarksActionsTab === 'remarks' ? 'Add Remark' : 'Add Action'}
+                                            </button>
+                                            <button id="add-close-complete-btn" class="btn btn-success" style="flex: 1;">
+                                                <span>✓</span> ${currentRemarksActionsTab === 'remarks' ? 'Add & Close' : 'Add & Complete'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    // Add click handlers for live edits
+                    detailsContainer.querySelectorAll('.edit-icon, .editable-value').forEach(el => {
+                        const wrapper = el.tagName === 'SPAN' && el.classList.contains('edit-icon') ? el.previousElementSibling : el;
+                        const field = wrapper.getAttribute('data-field');
+                        const isDateField = wrapper.getAttribute('data-is-date') === 'true';
+                        
+                        if (!field) return;
+
+                        el.onclick = async () => {
+                            const currentValue = item[field] || '';
+                            const isTimeField = wrapper.getAttribute('data-is-time') === 'true';
+                            
+                            if (isDateField) {
+                                // ... existing date logic ...
+                                const currentISO = dateToISO(currentValue) || '';
+                                
+                                showEditModal({
+                                    title: `Edit ${field}`,
+                                    label: `Enter new date for ${field}:`,
+                                    initialValue: currentISO,
+                                    type: 'date',
+                                    onSave: async (newValue) => {
+                                        if (newValue !== currentISO) {
+                                            item[field] = newValue;
+                                            
+                                            // Sync status if editing End Date
+                                            if (field === 'End Date') {
+                                                const hasDate = newValue && newValue.trim() && newValue.toLowerCase() !== 'n/a';
+                                                item['Action Status'] = hasDate ? 'Closed' : 'Open';
+                                                if (!hasDate) item['End Time'] = '';
+                                            }
+                                            
+                                            updateDetailsUI();
+                                            await saveActionUpdate(item, null, true); // Pass isUpdate=true
+                                        }
+                                    }
+                                });
+                            } else if (isTimeField) {
+                                let nowClicked = false;
+                                showEditModal({
+                                    title: `Edit ${field}`,
+                                    label: `Enter new time for ${field} (HH:MM):`,
+                                    initialValue: (currentValue === 'N/A' || !currentValue) ? '' : currentValue,
+                                    type: 'time',
+                                    onNow: () => {
+                                        nowClicked = true;
+                                    },
+                            onSave: async (newValue) => {
+                                if (newValue !== currentValue || nowClicked) {
+                                    // Store time in 24-hour format (HH:MM) for database
+                                    item[field] = newValue;
+
+                                            // Special logic for End Time: auto-fill End Date if "Now" was clicked
+                                            if (field === 'End Time' && nowClicked) {
+                                                const currentEndDate = item['End Date'];
+                                                if (!currentEndDate || currentEndDate === 'N/A' || currentEndDate === '') {
+                                                    const today = new Date().toISOString().split('T')[0];
+                                                    item['End Date'] = today;
+                                                    item['Action Status'] = 'Closed';
+                                                }
+                                            }
+
+                                            updateDetailsUI();
+                                            await saveActionUpdate(item, null, true); // Pass isUpdate=true
+                                        }
+                                    }
+                                });
+                            } else if (field === 'Time to Acknowledge' || field === 'Time to Recover' || field === 'Time to Detect') {
+                                showEditModal({
+                                    title: `Edit ${field}`,
+                                    label: `Enter duration for ${field}:`,
+                                    initialValue: currentValue,
+                                    type: 'duration',
+                                    onSave: async (newValue) => {
+                                        if (newValue !== currentValue) {
+                                            item[field] = newValue;
+                                            updateDetailsUI();
+                                            await saveActionUpdate(item, null, true); // Pass isUpdate=true
+                                        }
+                                    }
+                                });
+                            } else {
+                                // Use modal for non-date fields
+                                const isTextarea = wrapper.getAttribute('data-type') === 'textarea';
+                                showEditModal({
+                                    title: `Edit ${field}`,
+                                    label: `Enter new value for ${field}:`,
+                                    initialValue: currentValue,
+                                    type: isTextarea ? 'textarea' : 'text',
+                                    onSave: async (newValue) => {
+                                        if (newValue !== null && newValue !== currentValue) {
+                                            // For Action No. we need to be careful as it's the ID
+                                            // Store the original Action No. before updating
+                                            const oldActionNo = field === 'Action No.' ? item['Action No.'] : null;
+                                            item[field] = newValue;
+                                            
+                                            // Update UI immediately
+                                            updateDetailsUI();
+                                            
+                                            // Pass oldActionNo when Action No. is being changed
+                                            // If we are changing the ID, it's definitely an update
+                                            await saveActionUpdate(item, oldActionNo, true); // Pass isUpdate=true
+                                            
+                                            // If we changed the ID, we need to update the active reference immediately
+                                            if (field === 'Action No.') {
+                                                // Update the data-id attribute on the header so it remains the "active" action
+                                                const header = document.querySelector('.detail-title-row h3');
+                                                if (header) header.setAttribute('data-id', newValue);
+                                                
+                                                // Update the in-memory reference in currentItems so loadDashboardData doesn't overwrite it
+                                                const existingIndex = currentItems.findIndex(a => a['Action No.'] === oldActionNo);
+                                                if (existingIndex !== -1) {
+                                                    // Update the object in the array so the closure reference 'item' stays in sync
+                                                    Object.assign(currentItems[existingIndex], item);
+                                                }
+                                                
+                                                // No need to await loadDashboardData here as we've already updated the local state
+                                                loadDashboardData(weekPickerHidden.value, true);
+                                            }
+                                        }
+                                    }
+                                });
+                            }
+                        };
+                    });
+
+                    // Restore text if it was being edited
+                    if (existingRemark) {
+                        document.getElementById('new-remark-action-text').value = existingRemark;
+                    }
+
+                    // Setup dual picker for remark/action date
+                    setupDualDatePicker('remark-action-date-display', 'remark-action-date-hidden');
+
+                    // Tab switching handler for Remarks/Actions slider
+                    const tabRadios = detailsContainer.querySelectorAll('input[name="remarks-actions-tab"]');
+                    tabRadios.forEach(radio => {
+                        radio.addEventListener('change', (e) => {
+                            currentRemarksActionsTab = e.target.value;
+                            updateDetailsUI();
+                        });
+                    });
+
+                    // Add toggle switch handlers
+                    const statusCheckbox = detailsContainer.querySelector('#status-checkbox');
+                    const statusLabel = detailsContainer.querySelector('#status-toggle-label');
+                    const closureDateSpan = detailsContainer.querySelector('#detail-closure-date');
+
+                    if (statusCheckbox) {
+                        statusCheckbox.onchange = async () => {
+                            const isClosed = statusCheckbox.checked;
+                            const newStatus = isClosed ? 'Closed' : 'Open';
+                            const now = new Date();
+                            const newEndDate = isClosed ? now.toISOString().split('T')[0] : '';
+                            const newEndTime = isClosed ? getCurrentTime() : '';
+                            const endTimeSpan = detailsContainer.querySelector('#detail-end-time');
+                            
+                    // 1. Optimistic UI Update (Immediate feedback)
+                    if (statusLabel) {
+                        statusLabel.textContent = newStatus.toUpperCase();
+                        statusLabel.style.color = isClosed ? '#10b981' : '#ef4444';
+                    }
+                    if (closureDateSpan) {
+                        closureDateSpan.textContent = formatDateForDisplay(newEndDate);
+                    }
+                    if (endTimeSpan) {
+                        endTimeSpan.textContent = newEndTime || 'N/A';
+                    }
+                    
+                    // Update local data
+                    item['Action Status'] = newStatus;
+                    item['End Date'] = newEndDate;
+                    item['End Time'] = newEndTime;
+                    
+                    // 2. Background Save
+                    await saveActionUpdate(item, null, true);
+                        };
+                    }
+
+                    // Add delegation for Edit and Delete buttons (works for both Remarks and Actions)
+                    const container = document.getElementById('remarks-actions-container');
+                    if (container) {
+                        container.onclick = async (e) => {
+                            const target = e.target;
+
+                            // Handle Action Item Toggle
+                            if (target.classList.contains('action-item-toggle')) {
+                                const index = parseInt(target.getAttribute('data-index'));
+                                let actionItem = actionsData[index];
+                                const isChecked = target.checked;
+
+                                // Update label immediately for better UX
+                                const toggleRow = target.closest('.action-toggle-row');
+                                if (toggleRow) {
+                                    const labelSpan = toggleRow.querySelector('.toggle-label');
+                                    if (labelSpan) {
+                                        labelSpan.textContent = isChecked ? 'CLOSED' : 'OPEN';
+                                        labelSpan.style.color = isChecked ? 'var(--primary)' : 'var(--brand-red)';
+                                    }
+                                }
+
+                                if (isChecked) {
+                                    // Add [CLOSED] if not present
+                                    if (!actionItem.includes('[CLOSED]')) {
+                                        // Insert [CLOSED] after the assignee or date
+                                        // Format: [DD/MM/YYYY] [Assignee] [CLOSED] Text
+                                        actionItem = actionItem.replace(/^(\[\d{2}\/\d{2}\/\d{4}\]\s*(?:\[[^\]]+\])?\s*)/, '$1[CLOSED] ');
+                                    }
+                                } else {
+                                    // Remove [CLOSED]
+                                    actionItem = actionItem.replace(/\[CLOSED\]\s*/, '');
+                                }
+
+                                actionsData[index] = actionItem;
+                                const fullActions = actionsData.join('\r\n');
+                                item['Actions'] = fullActions;
+
+                                updateDetailsUI();
+                                await saveActionUpdate(item, null, true);
+                                return;
+                            }
+
+                            if (target.classList.contains('edit')) {
+                                const index = parseInt(target.getAttribute('data-index'));
+                                const type = target.getAttribute('data-type'); // 'remark' or 'action'
+                                
+                                if (type === 'remark') {
+                                    const oldRemark = remarksData[index];
+                                    showEditModal({
+                                        title: 'Edit Remark',
+                                        label: 'Update your remark:',
+                                        initialValue: oldRemark,
+                                        type: 'textarea',
+                                        onSave: async (newRemark) => {
+                                            if (newRemark !== null && newRemark.trim() !== '' && newRemark !== oldRemark) {
+                                                remarksData[index] = newRemark.trim();
+                                                const fullRemarks = remarksData.join('\r\n');
+                                                item['Remarks'] = fullRemarks;
+                                                
+                                                updateDetailsUI();
+                                                await saveActionUpdate(item, null, true);
+                                            }
+                                        }
+                                    });
+                                } else if (type === 'action') {
+                                    const oldAction = actionsData[index];
+                                    showEditModal({
+                                        title: 'Edit Action',
+                                        label: 'Update your action:',
+                                        initialValue: oldAction,
+                                        type: 'textarea',
+                                        onSave: async (newAction) => {
+                                            if (newAction !== null && newAction.trim() !== '' && newAction !== oldAction) {
+                                                actionsData[index] = newAction.trim();
+                                                const fullActions = actionsData.join('\r\n');
+                                                item['Actions'] = fullActions;
+                                                
+                                                updateDetailsUI();
+                                                await saveActionUpdate(item, null, true);
+                                            }
+                                        }
+                                    });
+                                }
+                            } else if (target.classList.contains('delete')) {
+                                const index = parseInt(target.getAttribute('data-index'));
+                                const type = target.getAttribute('data-type'); // 'remark' or 'action'
+                                
+                                const itemType = type === 'remark' ? 'remark' : 'action';
+                                const confirmed = await showNotificationModal({
+                                    title: `Delete ${itemType.charAt(0).toUpperCase() + itemType.slice(1)}`,
+                                    message: `Are you sure you want to delete this ${itemType}?`,
+                                    type: 'confirm'
+                                });
+                                
+                                if (confirmed) {
+                                    if (type === 'remark') {
+                                        remarksData.splice(index, 1);
+                                        const fullRemarks = remarksData.join('\r\n');
+                                        item['Remarks'] = fullRemarks;
+                                    } else if (type === 'action') {
+                                        actionsData.splice(index, 1);
+                                        const fullActions = actionsData.join('\r\n');
+                                        item['Actions'] = fullActions;
+                                    }
+                                    
+                                    updateDetailsUI();
+                                    await saveActionUpdate(item, null, true);
+                                }
+                            }
+                        };
+                    }
+
+                    // Add Remark/Action button handler
+                    const addBtn = document.getElementById('add-remark-action-btn');
+                    if (addBtn) {
+                        addBtn.onclick = async () => {
+                            const text = document.getElementById('new-remark-action-text').value.trim();
+                            const date = document.getElementById('remark-action-date-hidden').value;
+                            const assignee = document.getElementById('remark-action-assignee')?.value.trim();
+                            const itemType = currentRemarksActionsTab === 'remarks' ? 'remark' : 'action';
+
+                            if (!text) {
+                                await showNotificationModal({
+                                    title: `Missing ${itemType.charAt(0).toUpperCase() + itemType.slice(1)}`,
+                                    message: `Please enter a ${itemType}.`
+                                });
+                                return;
+                            }
+
+                            if (currentRemarksActionsTab === 'actions' && !assignee) {
+                                await showNotificationModal({
+                                    title: 'Missing Assignee',
+                                    message: 'Please specify who this action is assigned to.'
+                                });
+                                return;
+                            }
+
+                            // Prepend date and optionally assignee
+                            const dateParts = date.split('-');
+                            const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+                            let textWithDate = `[${formattedDate}] ${text}`;
+                            if (currentRemarksActionsTab === 'actions' && assignee) {
+                                textWithDate = `[${formattedDate}] [${assignee}] ${text}`;
+                            }
+
+                            if (currentRemarksActionsTab === 'remarks') {
+                                remarksData.unshift(textWithDate); // Add to top
+                                const fullRemarks = remarksData.join('\r\n');
+                                item['Remarks'] = fullRemarks;
+                            } else {
+                                actionsData.unshift(textWithDate); // Add to top
+                                const fullActions = actionsData.join('\r\n');
+                                item['Actions'] = fullActions;
+                            }
+
+                            // 1. Optimistic UI Update
+                            document.getElementById('new-remark-action-text').value = '';
+                            updateDetailsUI();
+
+                            // 2. Background Save
+                            await saveActionUpdate(item, null, true);
+                        };
+                    }
+
+                    // Add & Close / Add & Complete button handler
+                    const addCloseBtn = document.getElementById('add-close-complete-btn');
+                    if (addCloseBtn) {
+                        addCloseBtn.onclick = async () => {
+                            const text = document.getElementById('new-remark-action-text').value.trim();
+                            const date = document.getElementById('remark-action-date-hidden').value;
+                            const assignee = document.getElementById('remark-action-assignee')?.value.trim();
+                            const itemType = currentRemarksActionsTab === 'remarks' ? 'remark' : 'action';
+
+                            if (!text) {
+                                await showNotificationModal({
+                                    title: `Missing ${itemType.charAt(0).toUpperCase() + itemType.slice(1)}`,
+                                    message: `Please enter a ${itemType} for ${currentRemarksActionsTab === 'remarks' ? 'closing' : 'completing'}.`
+                                });
+                                return;
+                            }
+
+                            if (currentRemarksActionsTab === 'actions' && !assignee) {
+                                await showNotificationModal({
+                                    title: 'Missing Assignee',
+                                    message: 'Please specify who this action is assigned to.'
+                                });
+                                return;
+                            }
+
+                            const confirmed = await showNotificationModal({
+                                title: currentRemarksActionsTab === 'remarks' ? 'Close Action' : 'Complete Action',
+                                message: currentRemarksActionsTab === 'remarks' 
+                                    ? 'Are you sure you want to add this remark and mark the action as Closed?'
+                                    : 'Are you sure you want to add this action and mark the incident as Closed?',
+                                type: 'confirm'
+                            });
+
+                            if (!confirmed) return;
+
+                            // Prepend date and optionally assignee
+                            const dateParts = date.split('-');
+                            const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+                            let textWithDate = `[${formattedDate}] ${text}`;
+                            if (currentRemarksActionsTab === 'actions' && assignee) {
+                                textWithDate = `[${formattedDate}] [${assignee}] ${text}`;
+                            }
+                            
+                            // If completing an action, add [CLOSED] tag
+                            if (currentRemarksActionsTab === 'actions') {
+                                textWithDate = textWithDate.replace(/^(\[\d{2}\/\d{2}\/\d{4}\]\s*(?:\[[^\]]+\])?\s*)/, '$1[CLOSED] ');
+                            }
+
+                            if (currentRemarksActionsTab === 'remarks') {
+                                remarksData.unshift(textWithDate); // Add to top
+                                const fullRemarks = remarksData.join('\r\n');
+                                item['Remarks'] = fullRemarks;
+                            } else {
+                                actionsData.unshift(textWithDate); // Add to top
+                                const fullActions = actionsData.join('\r\n');
+                                item['Actions'] = fullActions;
+                            }
+                            
+                            item['Action Status'] = 'Closed';
+                            item['End Date'] = date;
+                            item['End Time'] = getCurrentTime();
+
+                            // 1. Optimistic UI Update
+                            document.getElementById('new-remark-action-text').value = '';
+                            updateDetailsUI();
+
+                            // 2. Background Save
+                            await saveActionUpdate(item, null, true);
+                            
+                            // 3. Silent Sync
+                            await loadDashboardData(weekPickerHidden.value, true);
+                        };
+                    }
+                }
+
+                updateDetailsUI();
+                detailModal.style.display = 'block';
+            }
+
+            async function saveActionUpdate(item, oldActionNo = null, isUpdate = false) {
+                try {
+                    const payload = {
+                        year: currentYear,
+                        week: currentWeek,
+                        type: currentDataType,
+                        action: item,
+                        is_update: isUpdate
+                    };
+                    
+                    // Include old_action_no when Action No. is being changed
+                    if (oldActionNo !== null) {
+                        payload.old_action_no = oldActionNo;
+                    }
+                    
+                    const response = await fetch('/api/data', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        if (response.status === 409) {
+                            showNotification('Conflict', 'This Action Number already exists for this data type.');
+                            throw new Error('Action Number conflict');
+                        }
+                        throw new Error(`Server returned ${response.status}`);
+                    }
+                } catch (e) {
+                    console.error('Error saving action update:', e);
+                    throw e; // Re-throw to handle in the caller
+                }
+            }
+
+            // --- Week Navigation Logic ---
+            const prevWeekBtn = document.getElementById('prev-week');
+            const nextWeekBtn = document.getElementById('next-week');
+            const periodWeek = document.getElementById('period-week');
+            const periodYear = document.getElementById('period-year');
+
+            if (periodWeek && periodYear) {
+                [periodWeek, periodYear].forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        const period = e.target.value;
+                        console.log('Period changed to:', period);
+                        // Logic to handle period change can be added here
+                    });
+                });
+            }
+
+            function shiftWeek(days) {
+                const currentDate = new Date(weekPickerHidden.value);
+                currentDate.setDate(currentDate.getDate() + days);
+                const newDateStr = currentDate.toISOString().split('T')[0];
+                weekPickerHidden.value = newDateStr;
+                weekPickerDisplay.value = isoToDMY(newDateStr);
+                currentPage = 1; // Reset to first page when week changes
+                loadDashboardData(newDateStr);
+            }
+
+            if (prevWeekBtn) {
+                prevWeekBtn.addEventListener('click', () => shiftWeek(-7));
+            }
+
+            if (nextWeekBtn) {
+                nextWeekBtn.addEventListener('click', () => shiftWeek(7));
+            }
+
+            // --- Table Filter Listeners ---
+            const tableSearch = document.getElementById('table-search');
+            if (tableSearch) {
+                tableSearch.addEventListener('input', () => {
+                    // Reset to first page when search changes
+                    currentPage = 1;
+                    updateDashboardUI(currentItems);
+                });
+            }
+
+            const rowLimit = document.getElementById('row-limit');
+            const tableContainer = document.querySelector('.table-container');
+            if (rowLimit && tableContainer) {
+                rowLimit.addEventListener('change', (e) => {
+                    // Reset to first page when page size changes
+                    currentPage = 1;
+                    const limit = e.target.value;
+                    tableContainer.classList.remove('limit-2', 'limit-4', 'limit-6', 'limit-8', 'limit-10');
+                    if (limit !== 'all') {
+                        tableContainer.classList.add(`limit-${limit}`);
+                    }
+                    updateDashboardUI(currentItems);
+                });
+            }
+
+            // --- Pagination Event Handlers ---
+            const prevPageBtn = document.getElementById('prev-page');
+            const nextPageBtn = document.getElementById('next-page');
+            
+            if (prevPageBtn) {
+                prevPageBtn.addEventListener('click', () => {
+                    if (currentPage > 1) {
+                        currentPage--;
+                        updateDashboardUI(currentItems);
+                    }
+                });
+            }
+
+            if (nextPageBtn) {
+                nextPageBtn.addEventListener('click', () => {
+                    // Calculate total pages based on current filter state
+                    const rowLimitSelect = document.getElementById('row-limit');
+                    const pageSizeValue = rowLimitSelect ? rowLimitSelect.value : 'all';
+                    const pageSize = pageSizeValue === 'all' ? displayItems.length : parseInt(pageSizeValue);
+                    const totalPages = pageSize > 0 ? Math.ceil(displayItems.length / pageSize) : 1;
+                    
+                    if (currentPage < totalPages) {
+                        currentPage++;
+                        updateDashboardUI(currentItems);
+                    }
+                });
+            }
+
+            // Initial load
+            updateDynamicLabels();
+            loadDashboardData(weekPickerHidden.value).then(() => {
+                startLiveSync();
+            });
+
+            // --- Keyboard Navigation for Modal ---
+            document.addEventListener('keydown', (e) => {
+                const detailModal = document.getElementById('incident-detail-modal');
+                if (detailModal && detailModal.style.display === 'block') {
+                    // Don't navigate if user is typing in an input or textarea
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                        return;
+                    }
+
+                    if (e.key === 'ArrowLeft') {
+                        const prevBtn = document.getElementById('prev-incident');
+                        if (prevBtn && !prevBtn.disabled) {
+                            prevBtn.click();
+                        }
+                    } else if (e.key === 'ArrowRight') {
+                        const nextBtn = document.getElementById('next-incident');
+                        if (nextBtn && !nextBtn.disabled) {
+                            nextBtn.click();
+                        }
+                    }
+                }
+            });
+            
+            // Export
+            const exportBtn = document.getElementById('export-btn');
+            const exportModal = document.getElementById('export-options-modal');
+            const confirmExportBtn = document.getElementById('confirm-export-btn');
+            const cancelExportBtn = document.getElementById('cancel-export-modal');
+            const closeExportBtn = document.getElementById('close-export-modal');
+
+            if (exportBtn && exportModal) {
+                exportBtn.addEventListener('click', () => {
+                    // Update modal text to reflect current data type
+                    const exportTypeText = document.getElementById('export-modal-data-type');
+                    if (exportTypeText) {
+                        exportTypeText.textContent = currentDataType === 'Crisis' ? 'Crises' : 'Incidents';
+                    }
+                    exportModal.style.display = 'block';
+                });
+
+                const closeExport = () => {
+                    exportModal.style.display = 'none';
+                };
+
+                cancelExportBtn.addEventListener('click', closeExport);
+                closeExportBtn.addEventListener('click', closeExport);
+
+                confirmExportBtn.addEventListener('click', () => {
+                    const selectedRange = document.querySelector('input[name="export-range"]:checked').value;
+
+                    // Only export the current data type (Incident or Crisis)
+                    const url = `/api/export?year=${currentYear}&week=${currentWeek}&type=${currentDataType}&range=${selectedRange}`;
+                    window.location.href = url;
+
+                    closeExport();
+                });
+            }
+            
+            // Import
+            const importBtn = document.getElementById('import-btn');
+            const importFileInput = document.getElementById('import-file-input');
+
+            if (importBtn && importFileInput) {
+                importBtn.addEventListener('click', () => {
+                    importFileInput.click();
+                });
+
+                importFileInput.addEventListener('change', async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('year', currentYear);
+                    formData.append('week', currentWeek);
+                    formData.append('type', currentDataType);
+
+                    try {
+                        const response = await fetch('/api/import', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const responseText = await response.text();
+                        let data;
+                        try {
+                            data = JSON.parse(responseText);
+                        } catch (e) {
+                            console.error('Failed to parse JSON response:', responseText);
+                            throw new Error('Invalid server response format');
+                        }
+
+                        if (response.ok && data.status === 'success') {
+                            await showNotificationModal({
+                                title: 'Import Successful',
+                                message: `<strong>Import summary:</strong>\n\nNew records: ${data.new}\nUpdated records: ${data.updated}\nUnchanged records: ${data.skipped}\nErrors: ${data.errors}`,
+                                type: 'info',
+                                importData: data
+                            });
+                            // Reload current data to reflect the imported data
+                            loadDashboardData(weekPickerHidden.value);
+                        } else {
+                            throw new Error(data.message || 'Import failed');
+                        }
+                    } catch (error) {
+                        console.error('Import failed:', error);
+                        await showNotificationModal({
+                            title: 'Import Error',
+                            message: 'Failed to import data: ' + error.message,
+                            type: 'error'
+                        });
+                    } finally {
+                        // Reset file input so the same file can be selected again
+                        importFileInput.value = '';
+                    }
+                });
+            }
+
+            // Initialize Database / Migrate CSV Data
+            document.getElementById('regularize-btn').addEventListener('click', async () => {
+                const confirmed = await showNotificationModal({
+                    title: 'Initialize Database',
+                    message: 'This will initialize the SQLite database and migrate all existing CSV data into it. Proceed?',
+                    type: 'confirm'
+                });
+
+                if (confirmed) {
+                    try {
+                        const response = await fetch('/api/regularize', { method: 'POST' });
+                        const data = await response.json();
+                        
+                        if (response.ok && data.status === 'success') {
+                            await showNotificationModal({
+                                title: 'Database Initialized',
+                                message: `${data.message}\n\nMigrated ${data.migrated} records from ${data.files_processed} CSV files. ${data.errors} errors.`
+                            });
+                            // Reload current data to reflect the migrated data
+                            loadDashboardData(weekPickerHidden.value);
+                        } else {
+                            throw new Error(data.message || 'Unknown error');
+                        }
+                    } catch (error) {
+                        console.error('Database initialization failed:', error);
+                        await showNotificationModal({
+                            title: 'Error',
+                            message: 'Failed to initialize database: ' + error.message
+                        });
+                    } finally {
+                    }
+                }
+            });
+
+            // Wire up "Now" buttons for time inputs
+            document.querySelectorAll('.btn-now').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const targetId = btn.getAttribute('data-target');
+                    // If data-target exists, use it (Add Modal), otherwise default to edit-modal-input (Edit Modal)
+                    const targetInput = targetId ? document.getElementById(targetId) : document.getElementById('edit-modal-input');
+                    if (targetInput) {
+                        targetInput.value = getCurrentTime();
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
