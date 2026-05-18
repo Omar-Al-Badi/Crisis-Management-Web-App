@@ -117,7 +117,6 @@
                     </button>
                     <div id="column-dropdown" class="column-dropdown">
                         <!-- Checkboxes will be dynamically generated or hardcoded -->
-                        <label class="column-option"><input type="checkbox" checked data-column="0"> Hide</label>
                         <label class="column-option"><input type="checkbox" checked data-column="1"> Incident No.</label>
                         <label class="column-option"><input type="checkbox" checked data-column="2"> ITSM Ticket</label>
                         <label class="column-option"><input type="checkbox" checked data-column="3"> Crisis/Incident</label>
@@ -480,6 +479,8 @@
         let lastSyncedTime = 0;
         let isPolling = false;
         let currentStatusFilter = 'all'; // Filter for Total, Open, Closed stat cards
+        const FILTER_OUT_HIDDEN_ROWS_KEY = 'filterOutHiddenRows';
+        let filterOutHiddenRows = true; // When true, exclude rows in hiddenRows from table and stats (client-only; no DB update)
         let hiddenRows = new Set();
         let currentPage = 1; // Pagination state
         let currentSortColumn = 1; // Default sort by Incident No.
@@ -811,23 +812,38 @@
             const viewModeBtn = document.getElementById('view-mode-btn');
             const weekPickerDisplay = document.getElementById('week-picker-display');
 
+            const storedFilterOut = localStorage.getItem(FILTER_OUT_HIDDEN_ROWS_KEY);
+            filterOutHiddenRows = storedFilterOut === null ? true : storedFilterOut === 'true';
+
+            function getViewModeBtnIconSvg() {
+                const attrs = 'width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+                if (filterOutHiddenRows) {
+                    // Hidden rows excluded from view — slashed eye (matches table hide affordance)
+                    return `<svg ${attrs}><path d="M9.88 9.88L2 2m7.88 7.88L12 12m-2.12-2.12L12 12m0 0l2.12 2.12M12 12l2.12 2.12M12 12l7.88 7.88M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"></path><line x1="2" y1="2" x2="22" y2="22"></line></svg>`;
+                }
+                return `<svg ${attrs}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+            }
+
+            function syncViewModeButton() {
+                if (!viewModeBtn) return;
+                viewModeBtn.innerHTML = getViewModeBtnIconSvg();
+                if (filterOutHiddenRows) {
+                    viewModeBtn.title = 'Show hidden rows';
+                    viewModeBtn.setAttribute('aria-label', 'Show hidden rows in the table');
+                } else {
+                    viewModeBtn.title = 'Hide filtered rows';
+                    viewModeBtn.setAttribute('aria-label', 'Hide rows marked as hidden from the table');
+                }
+            }
+            syncViewModeButton();
+
             viewModeBtn.addEventListener('click', () => {
-                hiddenRows.clear();
-                
-                // Reset in database
-                fetch('/api/show-all-rows', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ type: currentDataType })
-                }).catch(err => console.error('Error showing all rows:', err));
-
-                updateDashboardUI(currentItems);
-
-                // Show a brief notification
-                showNotificationModal({
-                    title: 'Rows Restored',
-                    message: 'All manually hidden rows have been restored to the view.'
-                });
+                filterOutHiddenRows = !filterOutHiddenRows;
+                localStorage.setItem(FILTER_OUT_HIDDEN_ROWS_KEY, String(filterOutHiddenRows));
+                syncViewModeButton();
+                if (typeof currentItems !== 'undefined' && currentItems) {
+                    updateDashboardUI(currentItems);
+                }
             });
 
             const weekPickerHidden = document.getElementById('week-picker-hidden');
@@ -867,24 +883,35 @@
                 });
             });
 
-            // Load visibility from localStorage or default to all visible
-            let visibleColumns = JSON.parse(localStorage.getItem('visibleColumns')) || [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+            // Data columns 1–16 only; column 0 (row actions) is always shown and not in this list
+            const DEFAULT_VISIBLE_DATA_COLUMNS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+            let visibleColumnsRaw = JSON.parse(localStorage.getItem('visibleColumns'));
+            let visibleColumns = Array.isArray(visibleColumnsRaw) && visibleColumnsRaw.length
+                ? visibleColumnsRaw.filter(c => typeof c === 'number' && c >= 1 && c <= 16)
+                : DEFAULT_VISIBLE_DATA_COLUMNS.slice();
+            if (!visibleColumns.length) {
+                visibleColumns = DEFAULT_VISIBLE_DATA_COLUMNS.slice();
+            }
+            localStorage.setItem('visibleColumns', JSON.stringify(visibleColumns));
             
             function applyColumnVisibility() {
                 const table = document.querySelector('table');
                 const rows = table.querySelectorAll('tr');
+                const visibleColSpan = 1 + visibleColumns.length;
                 
                 rows.forEach(row => {
                     const cells = row.cells;
                     
                     // Handle empty state row with colspan
                     if (cells.length === 1 && cells[0].hasAttribute('colspan')) {
-                        cells[0].setAttribute('colspan', visibleColumns.length);
+                        cells[0].setAttribute('colspan', visibleColSpan);
                         return;
                     }
 
                     for (let i = 0; i < cells.length; i++) {
-                        if (visibleColumns.includes(i)) {
+                        if (i === 0) {
+                            cells[i].classList.remove('col-hidden');
+                        } else if (visibleColumns.includes(i)) {
                             cells[i].classList.remove('col-hidden');
                         } else {
                             cells[i].classList.add('col-hidden');
@@ -1635,8 +1662,7 @@
 
                 // 2. Apply status and search filters
                 const filteredItems = displayItemsFull.filter(item => {
-                    // Frontend hidden filter
-                    if (hiddenRows.has(item['Action No.'])) return false;
+                    if (filterOutHiddenRows && hiddenRows.has(item['Action No.'])) return false;
 
                     // Status Filter
                     if (currentStatusFilter === 'open' && isItemClosed(item)) return false;
@@ -1664,8 +1690,8 @@
 
                 // 3. Update Stats based on relevant items for this week
                 const total = displayItemsFull.length;
-                const closedCount = displayItemsFull.filter(a => isItemClosed(a) && !hiddenRows.has(a['Action No.'])).length;
-                const openCount = displayItemsFull.filter(a => !isItemClosed(a) && !hiddenRows.has(a['Action No.'])).length;
+                const closedCount = displayItemsFull.filter(a => isItemClosed(a) && !(filterOutHiddenRows && hiddenRows.has(a['Action No.']))).length;
+                const openCount = displayItemsFull.filter(a => !isItemClosed(a) && !(filterOutHiddenRows && hiddenRows.has(a['Action No.']))).length;
 
                 document.querySelector('#stat-total .stat-value').textContent = openCount + closedCount;
                 document.querySelector('.stat-card.open .stat-value').textContent = openCount;
@@ -1704,7 +1730,7 @@
 
                 if (filteredItems.length === 0) {
                     const msg = searchVal ? `No ${plural.toLowerCase()} match your search` : `No ${plural.toLowerCase()} found for this period`;
-                    tbody.innerHTML = `<tr><td colspan="${visibleColumns.length}" style="text-align: center; padding: 2rem;">${msg}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="${1 + visibleColumns.length}" style="text-align: center; padding: 2rem;">${msg}</td></tr>`;
                     return;
                 }
 
@@ -1796,12 +1822,15 @@
                         }
                     }
 
+                    const rowHiddenInDb = hiddenRows.has(item['Action No.']) || !!item.hidden;
+                    const hideRowIconAttrs = 'width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img"';
+                    const hideRowIconHtml = rowHiddenInDb
+                        ? `<svg ${hideRowIconAttrs} class="hide-row-icon" title="Unhide row (restore in database)" aria-label="Unhide row and set hidden to 0 in the database"><path d="M9.88 9.88L2 2m7.88 7.88L12 12m-2.12-2.12L12 12m0 0l2.12 2.12M12 12l2.12 2.12M12 12l7.88 7.88M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"></path><line x1="2" y1="2" x2="22" y2="22"></line></svg>`
+                        : `<svg ${hideRowIconAttrs} class="hide-row-icon" title="Hide row from view" aria-label="Hide row from view"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+
                     tr.innerHTML = `
                         <td style="text-align: center;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hide-row-icon" title="Hide row from view">
-                                <path d="M9.88 9.88L2 2m7.88 7.88L12 12m-2.12-2.12L12 12m0 0l2.12 2.12M12 12l2.12 2.12M12 12l7.88 7.88M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"></path>
-                                <line x1="2" y1="2" x2="22" y2="22"></line>
-                            </svg>
+                            ${hideRowIconHtml}
                         </td>
                         <td data-id="${item['Action No.'] || ''}">${item['Action No.'] || 'N/A'}</td>
                         <td>${item['ITSM Ticket'] || 'N/A'}</td>
@@ -1832,18 +1861,29 @@
                         if (e.target.closest('.hide-row-icon')) {
                             e.stopPropagation();
                             const itemNo = item['Action No.'];
-                            hiddenRows.add(itemNo);
-                            
-                            // Save to database
+                            const currentlyHidden = hiddenRows.has(itemNo) || !!item.hidden;
+                            const nextHidden = currentlyHidden ? 0 : 1;
+
+                            item.hidden = nextHidden;
+                            if (typeof currentItems !== 'undefined' && currentItems) {
+                                const src = currentItems.find(a => a['Action No.'] === itemNo);
+                                if (src) src.hidden = nextHidden;
+                            }
+                            if (nextHidden === 1) {
+                                hiddenRows.add(itemNo);
+                            } else {
+                                hiddenRows.delete(itemNo);
+                            }
+
                             fetch('/api/hide-row', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                     action_no: itemNo,
                                     type: currentDataType,
-                                    hidden: 1
+                                    hidden: nextHidden
                                 })
-                            }).catch(err => console.error('Error hiding row:', err));
+                            }).catch(err => console.error('Error updating row hidden state:', err));
 
                             updateDashboardUI(currentItems);
                             return;

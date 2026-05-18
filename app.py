@@ -518,8 +518,6 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_save_data()
         elif parsed_path.path == "/api/hide-row":
             self.handle_hide_row()
-        elif parsed_path.path == "/api/show-all-rows":
-            self.handle_show_all_rows()
         elif parsed_path.path == "/api/import":
             self.handle_import()
         elif parsed_path.path == "/api/regularize":
@@ -788,24 +786,6 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"status": "error", "message": f"Import failed: {str(e)}"}).encode())
-
-    def handle_show_all_rows(self):
-        content_length = int(self.headers['Content-Length'])
-        post_data = json.loads(self.rfile.read(content_length))
-        
-        data_type = post_data.get("type", "Incident")
-        
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE items SET hidden = 0 WHERE data_type = ?",
-            (data_type,)
-        )
-        conn.commit()
-        conn.close()
-        
-        self.send_response(200)
-        self.end_headers()
 
     def handle_regularize(self):
         """Initialize SQLite database and migrate all existing CSV data into normalized schema."""
