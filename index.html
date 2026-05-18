@@ -197,14 +197,12 @@
     <!-- Incident Detail Modal -->
     <div id="incident-detail-modal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-header-left">
-                    <h3>Incident Detailed View</h3>
-                    <div class="modal-nav">
-                        <button id="prev-incident" class="nav-btn" title="Previous Incident">←</button>
-                        <span id="nav-count" class="nav-count">0 of 0</span>
-                        <button id="next-incident" class="nav-btn" title="Next Incident">→</button>
-                    </div>
+            <div class="modal-header modal-header--with-centered-nav">
+                <h3>Incident Detailed View</h3>
+                <div class="modal-nav">
+                    <button id="prev-incident" class="nav-btn" title="Previous Incident">←</button>
+                    <span id="nav-count" class="nav-count">0 of 0</span>
+                    <button id="next-incident" class="nav-btn" title="Next Incident">→</button>
                 </div>
                 <span class="close-modal" id="close-detail-modal">&times;</span>
             </div>
@@ -1962,7 +1960,7 @@
 
                 function renderRemarks() {
                     if (remarksData.length === 0) {
-                        return '<div class="detail-value">No remarks available.</div>';
+                        return '<div class="detail-value empty-state">No remarks available.</div>';
                     }
                     return `
                         <div class="remarks-list">
@@ -1975,7 +1973,7 @@
                                 
                                 return `
                                     <div class="remark-entry">
-                                        <div class="remark-items">
+                                        <div class="remark-actions">
                                             <span class="remark-action-btn edit" data-index="${index}" data-type="remark" title="Edit Remark">✎</span>
                                             <span class="remark-action-btn delete" data-index="${index}" data-type="remark" title="Delete Remark">🗑</span>
                                         </div>
@@ -1990,7 +1988,7 @@
 
                 function renderActions() {
                     if (actionsData.length === 0) {
-                        return '<div class="detail-value">No actions available.</div>';
+                        return '<div class="detail-value empty-state">No actions available.</div>';
                     }
                     return `
                         <div class="remarks-list">
@@ -2014,6 +2012,8 @@
                                                 </label>
                                                 <span class="toggle-label" style="color: ${isItemClosed ? 'var(--primary)' : 'var(--brand-red)'}">${isItemClosed ? 'CLOSED' : 'OPEN'}</span>
                                             </div>
+                                        </div>
+                                        <div class="remark-actions">
                                             <span class="remark-action-btn edit" data-index="${index}" data-type="action" title="Edit Action">✎</span>
                                             <span class="remark-action-btn delete" data-index="${index}" data-type="action" title="Delete Action">🗑</span>
                                         </div>
@@ -2127,9 +2127,9 @@
                                     <span class="edit-icon" title="Edit Description">✎</span>
                                 </div>
                             </div>
-                            <div class="detail-item" style="margin-top: 2rem;">
-                                <div style="display: flex; align-items: baseline; position: relative; margin-bottom: 1rem;">
-                                    <div class="detail-label" style="margin-bottom: 0; line-height: 45px;">${currentRemarksActionsTab === 'remarks' ? 'Current Remarks & Status Updates' : 'Current Actions & Tasks'}</div>
+                            <div class="detail-item" style="margin-top: 0.75rem;">
+                                <div style="display: flex; align-items: baseline; position: relative; margin-bottom: 0.25rem;">
+                                    <div class="detail-label" style="margin-bottom: 0; line-height: 1.4;">${currentRemarksActionsTab === 'remarks' ? 'Current Remarks & Status Updates' : 'Current Actions & Tasks'}</div>
                                     <div class="type-selector" style="position: absolute; left: 50%; transform: translateX(-50%); margin: 0; top: -45px;">
                                         <div class="segmented-control">
                                             <input type="radio" name="remarks-actions-tab" id="tab-remarks" value="remarks" ${currentRemarksActionsTab === 'remarks' ? 'checked' : ''}>

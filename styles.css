@@ -61,13 +61,13 @@ body {
 .container {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 0.75rem 1.5rem;
+    padding: 0.5rem 1.5rem;
 }
 
 header {
     background: var(--brand-red);
     color: white;
-    padding: 0.55rem 0;
+    padding: 0.35rem 0;
     box-shadow: var(--shadow);
     position: sticky;
     top: 0;
@@ -160,9 +160,9 @@ header .header-content.container {
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 0.35rem;
     position: relative;
 }
 
@@ -377,7 +377,7 @@ header .header-content.container {
 }
 
 .section-title {
-    margin: 1rem 0 0.75rem;
+    margin: 0.5rem 0 0.5rem;
     font-size: 1.5rem;
     color: var(--brand-red);
     font-weight: 800;
@@ -390,8 +390,8 @@ header .header-content.container {
 .stats-container {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 0.75rem;
-    margin-bottom: 0.875rem;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
 }
 
 .stat-card {
@@ -444,7 +444,7 @@ header .header-content.container {
 .stat-value {
     font-size: 1.75rem;
     font-weight: 800;
-    margin: 0.15rem 0 0;
+    margin: 0.1rem 0 0;
     color: var(--text-main);
 }
 
@@ -460,8 +460,8 @@ header .header-content.container {
 
 .actions {
     display: flex;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
 }
 
 .btn {
@@ -587,11 +587,11 @@ header .header-content.container {
     justify-content: space-between;
     align-items: center;
     background: var(--card-bg);
-    padding: 0.65rem 1rem;
+    padding: 0.45rem 1rem;
     border-radius: var(--border-radius) var(--border-radius) 0 0;
     border: 1px solid var(--border);
     border-bottom: none;
-    gap: 0.5rem;
+    gap: 0.35rem;
     flex-wrap: wrap;
 }
 
@@ -662,7 +662,7 @@ header .header-content.container {
     border-radius: 0 0 var(--border-radius) var(--border-radius);
     box-shadow: var(--shadow);
     overflow: auto;
-    margin-bottom: 0.65rem;
+    margin-bottom: 0.5rem;
     border: 1px solid var(--border);
     position: relative;
 }
@@ -735,12 +735,12 @@ header .header-content.container {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 0.45rem;
-    padding: 0.2rem 0.45rem;
+    gap: 0.35rem;
+    padding: 0.15rem 0.4rem;
     background: var(--hover-bg);
     border-radius: 14px;
     border: 1px solid var(--border);
-    margin: 0.3rem auto 0.55rem;
+    margin: 0.2rem auto 0.4rem;
     width: fit-content;
 }
 
@@ -907,23 +907,23 @@ td {
 .detail-view {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
 }
 
 .incident-details {
     background: var(--card-bg);
     border-radius: var(--border-radius);
     box-shadow: var(--shadow);
-    padding: 1rem 1.25rem;
+    padding: 0.75rem 1rem;
     border: 1px solid var(--border);
 }
 
 .detail-header {
     display: flex;
     flex-direction: column;
-    margin-bottom: 0.75rem;
-    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    gap: 0.35rem;
 }
 
 .detail-title-row {
@@ -1108,8 +1108,8 @@ input:checked + .slider:before {
 .detail-grid {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
 }
 
 .detail-item {
@@ -1131,11 +1131,17 @@ input:checked + .slider:before {
     width: 100%;
 }
 
+.detail-value.empty-state {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
 .history-section {
     background: var(--card-bg);
     border-radius: var(--border-radius);
     box-shadow: var(--shadow);
-    padding: 1rem;
+    padding: 0.75rem;
     align-self: start;
     position: sticky;
     top: 2rem;
@@ -1144,8 +1150,8 @@ input:checked + .slider:before {
 
 .history-title {
     font-size: 1.25rem;
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.5rem;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.35rem;
     border-bottom: 2px solid var(--border);
     color: var(--text-main);
 }
@@ -1153,7 +1159,7 @@ input:checked + .slider:before {
 .history-list {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.5rem;
 }
 
 .history-item {
@@ -1216,8 +1222,8 @@ input:checked + .slider:before {
 
 .modal-content {
     background-color: var(--card-bg);
-    margin: 3% auto;
-    padding: 1.25rem;
+    margin: 1% auto;
+    padding: 0.4rem 0.6rem;
     border: 1px solid var(--border);
     width: 90%;
     max-width: 800px;
@@ -1233,6 +1239,175 @@ input:checked + .slider:before {
     background: transparent;
 }
 
+/* Compact sizing for all modals — aligns with dashboard / table-toolbar scale */
+.modal-content .btn {
+    height: 38px;
+    min-height: 38px;
+    font-size: 0.85rem;
+}
+
+.modal-content .form-control {
+    height: 38px;
+    min-height: 38px;
+    font-size: 0.85rem;
+}
+
+.modal-content textarea.form-control {
+    min-height: 80px;
+    height: auto;
+}
+
+.modal-content .btn-now {
+    height: 38px;
+    min-height: 38px;
+    font-size: 0.8rem;
+}
+
+.modal-content .segmented-control {
+    height: 38px;
+    min-height: 38px;
+}
+
+.modal-content .segmented-control label {
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.82rem;
+}
+
+.modal-content .detail-meta {
+    font-size: 0.85rem;
+    gap: 0.3rem 0.5rem;
+}
+
+.modal-content .detail-label {
+    font-size: 0.8rem;
+}
+
+.modal-content .detail-title-row h3 {
+    font-size: 1.25rem;
+}
+
+.modal-content .status-toggle-container strong {
+    font-size: 0.85rem;
+}
+
+.modal-content .toggle-label {
+    font-size: 0.8rem;
+}
+
+.modal-content .remark-text {
+    font-size: 0.85rem;
+}
+
+.modal-content .remark-date {
+    font-size: 0.75rem;
+}
+
+.modal-content .remark-assignee {
+    font-size: 0.75rem;
+}
+
+.modal-content .modal-header h3 {
+    font-size: 1.25rem;
+    margin: 0;
+    line-height: 1.25;
+}
+
+.modal-content .modal-header-left {
+    align-items: center;
+}
+
+.modal-content .modal-nav {
+    padding: 0.12rem 0.4rem;
+    gap: 0.45rem;
+    align-items: center;
+    border-radius: 999px;
+}
+
+.modal-content .nav-btn {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+    font-size: 0.85rem;
+}
+
+.modal-content .form-label {
+    font-size: 0.8rem;
+}
+
+.modal-content .nav-count {
+    font-size: 0.8rem;
+    line-height: 1;
+    min-height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content .detail-grid {
+    gap: 0.25rem;
+    margin-bottom: 0.25rem;
+}
+
+.modal-content .detail-item {
+    margin-bottom: 0.25rem;
+}
+
+.modal-content .add-remark-form {
+    margin-top: 0.35rem;
+    padding-top: 0.35rem;
+    gap: 0.25rem;
+}
+
+.modal-content .form-row {
+    gap: 0.35rem;
+}
+
+.modal-content .form-group {
+    gap: 0.15rem;
+}
+
+.modal-content .detail-header {
+    margin-bottom: 0.35rem;
+    gap: 0.3rem;
+}
+
+.modal-content .remarks-list {
+    gap: 0.25rem;
+    margin-top: 0.15rem;
+}
+
+.modal-content .remark-entry {
+    padding: 0.4rem 0.5rem 0.4rem 1rem;
+}
+
+.modal-content .description-box {
+    padding: 0.4rem 0.5rem 0.4rem 1rem;
+    margin-top: 0.15rem;
+    margin-bottom: 2.5rem;
+}
+
+.modal-content .detail-label {
+    margin-bottom: 0.05rem;
+}
+
+.modal-content .detail-value {
+    padding: 0.05rem 0;
+}
+
+.modal-content .detail-value.empty-state {
+    font-size: 0.8rem;
+}
+
+.modal-content .action-toggle-row {
+    gap: 6px;
+    margin-bottom: 0.15rem;
+    padding: 0.1rem 0;
+}
+
 @keyframes modalSlideDown {
     from { transform: translateY(-30px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
@@ -1242,9 +1417,30 @@ input:checked + .slider:before {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
+    padding-bottom: 0.2rem;
     border-bottom: 1px solid var(--border);
+}
+
+/* Incident detail: prev/next sits in true horizontal center of header */
+.modal-header--with-centered-nav {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 0.25rem 0.35rem;
+}
+
+.modal-header--with-centered-nav > h3 {
+    margin: 0;
+    justify-self: start;
+}
+
+.modal-header--with-centered-nav .modal-nav {
+    justify-self: center;
+}
+
+.modal-header--with-centered-nav .close-modal {
+    justify-self: end;
 }
 
 .modal-header-left {
@@ -1327,7 +1523,7 @@ input:checked + .slider:before {
 
 .remark-entry {
     background: rgba(245, 158, 11, 0.05);
-    padding: 0.6rem 0.75rem;
+    padding: 0.6rem 0.75rem 0.6rem 4.5rem;
     border-radius: 8px;
     border-left: 4px solid var(--warning);
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
@@ -1341,7 +1537,7 @@ input:checked + .slider:before {
 .remark-items {
     position: absolute;
     top: 0.5rem;
-    right: 0.75rem;
+    left: 0.75rem;
     display: flex;
     gap: 0.75rem;
     align-items: center;
@@ -1376,6 +1572,15 @@ input:checked + .slider:before {
     transform: scale(1.2);
 }
 
+/* Remark edit button: pencil glyph (✎) points left like other edit buttons */
+.remark-action-btn.edit {
+    transform: scaleX(-1);
+}
+
+.remark-action-btn.edit:hover {
+    transform: scaleX(-1) scale(1.2);
+}
+
 .remark-action-btn.delete:hover {
     color: var(--danger);
 }
@@ -1384,8 +1589,42 @@ input:checked + .slider:before {
     font-size: 0.8rem;
     font-weight: 700;
     color: var(--warning);
-    margin-bottom: 0.3rem;
     text-transform: uppercase;
+}
+
+/* Layout: date and action icons on the same line, icons on the right */
+.remark-entry {
+    position: relative;
+}
+
+/* Position actions absolutely on the right, aligned with the date */
+.remark-entry > .remark-actions {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.75rem;
+    display: flex;
+    gap: 0.5rem;
+    z-index: 2;
+}
+
+.modal-content .remark-entry > .remark-actions {
+    top: 0.4rem;
+    right: 0.5rem;
+}
+
+.remark-entry > .remark-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    padding-right: 2rem;
+}
+
+.remark-entry > .remark-meta-row .remark-date {
+    flex: 1;
+}
+
+.remark-entry > .remark-meta-row .remark-assignee {
+    width: 100%;
 }
 
 .remark-meta-row {
@@ -1419,7 +1658,7 @@ input:checked + .slider:before {
 
 .description-box {
     background: rgba(245, 158, 11, 0.05);
-    padding: 0.6rem 0.75rem;
+    padding: 0.6rem 0.75rem 0.6rem 1rem;
     border-radius: 8px;
     border-left: 4px solid var(--warning);
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
@@ -1581,11 +1820,11 @@ textarea.form-control {
 
 footer {
     text-align: center;
-    padding: 0.35rem 0 0.45rem;
+    padding: 0.25rem 0 0.35rem;
     color: var(--text-muted);
     font-size: 0.8rem;
     border-top: 1px solid var(--border);
-    margin-top: 0.65rem;
+    margin-top: 0.4rem;
 }
 
 footer p {
