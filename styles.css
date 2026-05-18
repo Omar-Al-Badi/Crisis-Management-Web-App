@@ -987,7 +987,7 @@ td {
 .switch.small .slider:before {
     height: 12px;
     width: 12px;
-    left: 3px;
+    left: 0;
     bottom: 3px;
 }
 
@@ -996,7 +996,7 @@ td {
     content: "";
     height: 18px;
     width: 18px;
-    left: 3px;
+    left: 0;
     bottom: 3px;
     background-color: white;
     transition: .4s;
@@ -1012,11 +1012,9 @@ input:checked + .slider {
 }
 
 input:checked + .slider:before {
-    transform: translateX(26px);
-}
-
-.switch.small input:checked + .slider:before {
-    transform: translateX(18px);
+    left: auto;
+    right: 3px;
+    transform: none;
 }
 
 .remark-entry.closed {
@@ -1056,7 +1054,8 @@ input:checked + .slider:before {
     font-size: 0.85rem;
     font-weight: 700;
     text-transform: uppercase;
-    min-width: 50px;
+    min-width: 3.75rem;
+    text-align: right;
 }
 
 .detail-meta {
