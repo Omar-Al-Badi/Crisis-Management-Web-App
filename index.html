@@ -87,10 +87,10 @@
             </div>
             <div class="toolbar-actions">
                 <button id="add-action-btn" class="btn btn-primary">
-                    <span>✚</span> Add New Incident
+                    Add New Incident
                 </button>
                 <button id="export-btn" class="btn btn-outline" title="Export Report">
-                    <span>↓</span> Export Report
+                    Export Report
                 </button>
                 <button id="import-btn" class="btn btn-outline" title="Import CSV Data" aria-label="Import Data">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -705,7 +705,7 @@
                 document.getElementById('stat-open').querySelector('.stat-label').textContent = `Open ${plural}`;
                 document.getElementById('stat-closed').querySelector('.stat-label').textContent = `Closed ${plural}`;
                 document.getElementById('table-search').placeholder = `Search ${plural.toLowerCase()}...`;
-                document.getElementById('add-action-btn').innerHTML = `<span>✚</span> Add New ${singular}`;
+                document.getElementById('add-action-btn').textContent = `Add New ${singular}`;
                 
                 // Show/hide reference group in add modal
                 const refGroup = document.getElementById('new-reference-group');
@@ -2163,10 +2163,10 @@
                                         </div>
                                         <div class="form-group" style="flex: 2; display: flex; gap: 0.5rem; align-items: flex-end;">
                                             <button id="add-remark-action-btn" class="btn btn-primary" style="flex: 1;">
-                                                <span>✚</span> ${currentRemarksActionsTab === 'remarks' ? 'Add Remark' : 'Add Action'}
+                                                ${currentRemarksActionsTab === 'remarks' ? 'Add Remark' : 'Add Action'}
                                             </button>
                                             <button id="add-close-complete-btn" class="btn btn-success" style="flex: 1;">
-                                                <span>✓</span> ${currentRemarksActionsTab === 'remarks' ? 'Add & Close' : 'Add & Complete'}
+                                                ${currentRemarksActionsTab === 'remarks' ? 'Add & Close' : 'Add & Complete'}
                                             </button>
                                         </div>
                                     </div>
