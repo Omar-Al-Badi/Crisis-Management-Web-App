@@ -239,6 +239,22 @@ header .header-content.container {
     transition: transform 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
 }
 
+.type-selector .segmented-control.main-type-selector {
+    width: 360px;
+}
+
+.type-selector .segmented-control.main-type-selector .selection-slider {
+    width: calc(33.33% - 2px);
+}
+
+.type-selector #type-crisis:checked ~ .selection-slider {
+    transform: translateX(100%);
+}
+
+.type-selector #type-miscellaneous:checked ~ .selection-slider {
+    transform: translateX(200%);
+}
+
 #type-crisis:checked ~ .selection-slider {
     transform: translateX(100%);
 }
@@ -1540,6 +1556,22 @@ input:checked + .slider:before {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 0.5rem;
+}
+
+#add-misc-fields .add-misc-form-row-1 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+#add-misc-fields .add-misc-form-row-2 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 0.5rem;
+}
+
+@media (max-width: 640px) {
+    #add-misc-fields .add-misc-form-row-1,
+    #add-misc-fields .add-misc-form-row-2 {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
 }
 
 .remark-entry {

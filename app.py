@@ -85,6 +85,45 @@ FRONTEND_TO_BACKEND = {
 }
 BACKEND_TO_FRONTEND = {v: k for k, v in FRONTEND_TO_BACKEND.items()}
 
+# --- Miscellaneous (GM-assigned tasks) ---
+MISC_COLUMNS = [
+    "Task No.", "Title", "Description", "Assigned Team", "Assigned By",
+    "Status", "Created Date", "Created Time", "Due Date", "Remarks",
+    "Completed Date", "Completed Time", "Hidden"
+]
+
+MISC_CSV_TO_DB = {
+    "Task No.": "task_no",
+    "Title": "title",
+    "Description": "description",
+    "Assigned Team": "assigned_team",
+    "Assigned By": "assigned_by",
+    "Due Date": "due_date",
+    "Remarks": "remarks",
+    "Created Date": "created_date",
+    "Created Time": "created_time",
+    "Hidden": "hidden",
+}
+
+MISC_DB_TO_CSV = {v: k for k, v in MISC_CSV_TO_DB.items()}
+
+MISC_CORE_FIELDS = [
+    "title", "description", "assigned_team", "assigned_by",
+    "created_date", "created_time", "due_date", "remarks", "hidden"
+]
+
+MISC_WEEK_STATUS_FIELDS = {"status", "completed_date", "completed_time"}
+
+MISC_DATE_FIELDS = {"created_date", "due_date"}
+
+MISC_TIME_FIELDS = {"created_time", "completed_time"}
+
+EXPORT_PLURAL = {
+    "Crisis": "Crises",
+    "Incident": "Incidents",
+    "Miscellaneous": "Miscellaneous",
+}
+
 
 def is_normalized_schema():
     """Check if the database uses the normalized schema (has week_status table)."""
@@ -324,6 +363,38 @@ def init_db():
     """)
     
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_week_lookup ON week_status(year, week)")
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS misc_tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_no TEXT NOT NULL UNIQUE,
+            title TEXT,
+            description TEXT,
+            assigned_team TEXT,
+            assigned_by TEXT,
+            created_date TEXT,
+            created_time TEXT,
+            due_date TEXT,
+            remarks TEXT,
+            hidden INTEGER DEFAULT 0
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS misc_week_status (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER NOT NULL,
+            year INTEGER NOT NULL,
+            week INTEGER NOT NULL,
+            status TEXT,
+            completed_date TEXT,
+            completed_time TEXT,
+            FOREIGN KEY (task_id) REFERENCES misc_tasks(id) ON DELETE CASCADE,
+            UNIQUE(task_id, year, week)
+        )
+    """)
+
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_misc_week_lookup ON misc_week_status(year, week)")
     
     conn.commit()
     conn.close()
@@ -492,6 +563,134 @@ def normalize_time_to_24h(time_str):
     return time_str
 
 
+def misc_row_to_dict(task_row, week_status_row=None):
+    """Convert misc_tasks + misc_week_status rows to API/CSV dict."""
+    if task_row is None:
+        return None
+
+    item = {}
+    for csv_col, db_col in MISC_CSV_TO_DB.items():
+        item[csv_col] = task_row[db_col] if db_col in task_row.keys() and task_row[db_col] is not None else ""
+
+    hidden_val = task_row["hidden"] if "hidden" in task_row.keys() else None
+    try:
+        item["hidden"] = int(hidden_val) if hidden_val is not None and hidden_val != '' else 0
+    except (ValueError, TypeError):
+        item["hidden"] = 0
+
+    if week_status_row:
+        item["Status"] = week_status_row["status"] if week_status_row["status"] else ""
+        item["Completed Date"] = week_status_row["completed_date"] if week_status_row["completed_date"] else ""
+        item["Completed Time"] = week_status_row["completed_time"] if week_status_row["completed_time"] else ""
+    else:
+        item["Status"] = ""
+        item["Completed Date"] = ""
+        item["Completed Time"] = ""
+
+    return item
+
+
+def misc_dict_core_values(item):
+    """Values for misc_tasks insert/update (excluding task_no)."""
+    values = []
+    for col in MISC_CORE_FIELDS:
+        csv_col = MISC_DB_TO_CSV.get(col)
+        val = item.get(csv_col, "") if csv_col else ""
+        if col in MISC_DATE_FIELDS:
+            val = normalize_date(val)
+        elif col in MISC_TIME_FIELDS:
+            val = normalize_time_to_24h(val)
+        values.append(val)
+    return values
+
+
+def get_misc_task_id(cursor, task_no):
+    cursor.execute("SELECT id FROM misc_tasks WHERE task_no = ?", (task_no,))
+    row = cursor.fetchone()
+    return row[0] if row else None
+
+
+def misc_is_closed(item):
+    status = item.get("Status", "")
+    completed_date = item.get("Completed Date", "")
+    return status == "Closed" or (completed_date and completed_date.strip() and completed_date.lower() != "n/a")
+
+
+def misc_has_started_by_week(item, target_year, target_week):
+    start_date_str = item.get("Created Date", "")
+    if not start_date_str or start_date_str == "N/A":
+        return True
+    try:
+        if "-" in start_date_str:
+            year, month, day = map(int, start_date_str.split("-"))
+        elif "/" in start_date_str:
+            day, month, year = map(int, start_date_str.split("/"))
+        else:
+            return True
+        start_date = datetime(year, month, day)
+        year_start = datetime(target_year, 1, 1)
+        first_sunday_offset = (7 - year_start.weekday()) % 7
+        first_sunday = year_start + timedelta(days=first_sunday_offset)
+        if target_week == 0:
+            week_end = first_sunday - timedelta(days=1)
+        else:
+            week_end = first_sunday + timedelta(weeks=target_week, days=-1)
+        return start_date <= week_end
+    except Exception:
+        return True
+
+
+def misc_carry_over_from_previous(target_year, target_week):
+    if not db_exists():
+        return []
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT DISTINCT ws.year, ws.week
+        FROM misc_week_status ws
+        ORDER BY ws.year DESC, ws.week DESC
+    """)
+    weeks_available = cursor.fetchall()
+
+    for row in weeks_available:
+        y, w = row['year'], row['week']
+        if y > target_year:
+            continue
+        if y == target_year and w >= target_week:
+            continue
+
+        cursor.execute("""
+            SELECT t.*, ws.status, ws.completed_date, ws.completed_time
+            FROM misc_tasks t
+            INNER JOIN misc_week_status ws ON t.id = ws.task_id
+            WHERE ws.year = ? AND ws.week = ?
+        """, (y, w))
+        prev_rows = cursor.fetchall()
+        if len(prev_rows) == 0:
+            continue
+
+        prev_items = []
+        for r in prev_rows:
+            week_status = {
+                "status": r["status"],
+                "completed_date": r["completed_date"],
+                "completed_time": r["completed_time"],
+            }
+            prev_items.append(misc_row_to_dict(r, week_status))
+
+        carried = [
+            a for a in prev_items
+            if not misc_is_closed(a) and misc_has_started_by_week(a, target_year, target_week)
+        ]
+        conn.close()
+        return carried
+
+    conn.close()
+    return []
+
+
 class CrisisHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         # Custom logging to see what's happening
@@ -541,10 +740,16 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
             
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE items SET hidden = ? WHERE action_no = ? AND data_type = ?",
-            (hidden, action_no, data_type)
-        )
+        if data_type == "Miscellaneous":
+            cursor.execute(
+                "UPDATE misc_tasks SET hidden = ? WHERE task_no = ?",
+                (hidden, action_no)
+            )
+        else:
+            cursor.execute(
+                "UPDATE items SET hidden = ? WHERE action_no = ? AND data_type = ?",
+                (hidden, action_no, data_type)
+            )
         conn.commit()
         conn.close()
         
@@ -645,6 +850,103 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
             # Ensure database exists
             if not db_exists():
                 init_db()
+
+            if data_type == "Miscellaneous":
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                for row in reader:
+                    try:
+                        task_no = row.get("Task No.")
+                        if not task_no:
+                            continue
+                        task_id = get_misc_task_id(cursor, task_no)
+                        if not task_id:
+                            item_col_names = ["task_no"] + MISC_CORE_FIELDS
+                            placeholders = ", ".join(["?"] * len(item_col_names))
+                            item_values = [task_no] + misc_dict_core_values(row)
+                            cursor.execute(
+                                f"INSERT INTO misc_tasks ({', '.join(item_col_names)}) VALUES ({placeholders})",
+                                tuple(item_values)
+                            )
+                            task_id = cursor.lastrowid
+                            cursor.execute("""
+                                INSERT OR REPLACE INTO misc_week_status (task_id, year, week, status, completed_date, completed_time)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                            """, (task_id, year, week,
+                                  row.get("Status", "Open"),
+                                  normalize_date(row.get("Completed Date", "")),
+                                  normalize_time_to_24h(row.get("Completed Time", ""))))
+                            new_count += 1
+                        else:
+                            changed = False
+                            cursor.execute(f"SELECT {', '.join(MISC_CORE_FIELDS)} FROM misc_tasks WHERE id = ?", (task_id,))
+                            existing_item = cursor.fetchone()
+                            if existing_item:
+                                for i, col in enumerate(MISC_CORE_FIELDS):
+                                    csv_col = MISC_DB_TO_CSV.get(col)
+                                    if csv_col:
+                                        csv_val = str(row.get(csv_col, "")).strip()
+                                        db_val = str(existing_item[i] if existing_item[i] is not None else "").strip()
+                                        if csv_val != db_val:
+                                            changed = True
+                                            break
+                            if not changed:
+                                cursor.execute("""
+                                    SELECT status, completed_date, completed_time
+                                    FROM misc_week_status WHERE task_id = ? AND year = ? AND week = ?
+                                """, (task_id, year, week))
+                                existing_status = cursor.fetchone()
+                                if not existing_status:
+                                    changed = True
+                                else:
+                                    if (str(row.get("Status", "")).strip() != str(existing_status["status"] or "").strip() or
+                                            str(row.get("Completed Date", "")).strip() != str(existing_status["completed_date"] or "").strip() or
+                                            str(row.get("Completed Time", "")).strip() != str(existing_status["completed_time"] or "").strip()):
+                                        changed = True
+                            if changed:
+                                update_parts = []
+                                values = []
+                                for col in MISC_CORE_FIELDS:
+                                    csv_col = MISC_DB_TO_CSV.get(col)
+                                    if csv_col:
+                                        update_parts.append(f"{col} = ?")
+                                        val = row.get(csv_col, "")
+                                        if col in MISC_DATE_FIELDS:
+                                            val = normalize_date(val)
+                                        elif col in MISC_TIME_FIELDS:
+                                            val = normalize_time_to_24h(val)
+                                        values.append(val)
+                                values.append(task_id)
+                                cursor.execute(
+                                    f"UPDATE misc_tasks SET {', '.join(update_parts)} WHERE id = ?",
+                                    values
+                                )
+                                cursor.execute("""
+                                    INSERT OR REPLACE INTO misc_week_status (task_id, year, week, status, completed_date, completed_time)
+                                    VALUES (?, ?, ?, ?, ?, ?)
+                                """, (task_id, year, week,
+                                      row.get("Status", ""),
+                                      normalize_date(row.get("Completed Date", "")),
+                                      normalize_time_to_24h(row.get("Completed Time", ""))))
+                                updated_count += 1
+                            else:
+                                skipped_count += 1
+                    except Exception as row_err:
+                        print(f"Error importing misc row: {row_err}")
+                        error_count += 1
+                conn.commit()
+                conn.close()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "status": "success",
+                    "new": new_count,
+                    "updated": updated_count,
+                    "skipped": skipped_count,
+                    "errors": error_count
+                }).encode())
+                return
                 
             conn = get_db_connection()
             cursor = conn.cursor()
@@ -814,7 +1116,9 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
         for root, dirs, files in os.walk(DATA_DIR):
             for file in files:
                 # Process Incident, Crisis, and Action CSV files
-                if (file.startswith("Incident_Week_") or file.startswith("Crisis_Week_") or file.startswith("Action_Week_")) and file.endswith(".csv"):
+                if ((file.startswith("Incident_Week_") or file.startswith("Crisis_Week_") or
+                     file.startswith("Action_Week_") or file.startswith("Miscellaneous_Week_")) and
+                        file.endswith(".csv")):
                     file_path = os.path.join(root, file)
                     try:
                         # Extract year from directory name and week/type from filename
@@ -828,8 +1132,39 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                         parts = file.replace(".csv", "").split("_Week_")
                         if len(parts) != 2:
                             continue
-                        data_type = parts[0]  # Incident, Crisis, or Action
+                        data_type = parts[0]  # Incident, Crisis, Action, or Miscellaneous
                         week = int(parts[1])
+
+                        if data_type == "Miscellaneous":
+                            tasks = self.read_misc_csv(file_path)
+                            if tasks is not None:
+                                for task in tasks:
+                                    task_no = task.get("Task No.", "")
+                                    if not task_no:
+                                        continue
+                                    task_id = get_misc_task_id(cursor, task_no)
+                                    if not task_id:
+                                        item_col_names = ["task_no"] + MISC_CORE_FIELDS
+                                        placeholders = ", ".join(["?"] * len(item_col_names))
+                                        item_values = [task_no] + misc_dict_core_values(task)
+                                        cursor.execute(
+                                            f"INSERT INTO misc_tasks ({', '.join(item_col_names)}) VALUES ({placeholders})",
+                                            tuple(item_values)
+                                        )
+                                        task_id = cursor.lastrowid
+                                    normalized_completed_time = normalize_time_to_24h(task.get("Completed Time", ""))
+                                    cursor.execute("""
+                                        INSERT OR REPLACE INTO misc_week_status (task_id, year, week, status, completed_date, completed_time)
+                                        VALUES (?, ?, ?, ?, ?, ?)
+                                    """, (task_id, year, week,
+                                          task.get("Status", "Open"),
+                                          task.get("Completed Date", ""),
+                                          normalized_completed_time))
+                                    migrated_count += 1
+                                files_processed += 1
+                            else:
+                                error_count += 1
+                            continue
                         
                         actions = self.read_csv(file_path)
                         if actions is not None:
@@ -948,6 +1283,248 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(result).encode())
 
+    def handle_get_misc_data(self, year, week, is_year_mode):
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        last_modified = os.path.getmtime(DB_PATH) if os.path.exists(DB_PATH) else 0
+
+        if is_year_mode:
+            cursor.execute("""
+                SELECT t.*, ws.status, ws.completed_date, ws.completed_time
+                FROM misc_tasks t
+                LEFT JOIN (
+                    SELECT task_id, status, completed_date, completed_time,
+                           ROW_NUMBER() OVER (PARTITION BY task_id ORDER BY year DESC, week DESC) as rn
+                    FROM misc_week_status
+                    WHERE year = ?
+                ) ws ON t.id = ws.task_id AND ws.rn = 1
+            """, (year,))
+        else:
+            cursor.execute("""
+                SELECT t.*, ws.status, ws.completed_date, ws.completed_time
+                FROM misc_tasks t
+                LEFT JOIN misc_week_status ws ON t.id = ws.task_id AND ws.year = ? AND ws.week = ?
+            """, (year, week))
+
+        rows = cursor.fetchall()
+        items_with_status = [row for row in rows if row["status"] is not None]
+        items_without_status = [row for row in rows if row["status"] is None]
+        items = []
+
+        for row in items_with_status:
+            week_status = {
+                "status": row["status"],
+                "completed_date": row["completed_date"],
+                "completed_time": row["completed_time"],
+            }
+            items.append(misc_row_to_dict(row, week_status))
+
+        if items_without_status and not is_year_mode:
+            made_changes = False
+            for row in items_without_status:
+                task_id = row["id"]
+                cursor.execute("""
+                    SELECT status, completed_date, completed_time
+                    FROM misc_week_status
+                    WHERE task_id = ? AND (year < ? OR (year = ? AND week < ?))
+                    ORDER BY year DESC, week DESC
+                    LIMIT 1
+                """, (task_id, year, year, week))
+                nearest = cursor.fetchone()
+                if not nearest:
+                    cursor.execute("""
+                        SELECT status, completed_date, completed_time
+                        FROM misc_week_status
+                        WHERE task_id = ? AND (year > ? OR (year = ? AND week > ?))
+                        ORDER BY year ASC, week ASC
+                        LIMIT 1
+                    """, (task_id, year, year, week))
+                    nearest = cursor.fetchone()
+                if nearest:
+                    status_val = nearest["status"] or ""
+                    completed_date_val = nearest["completed_date"] or ""
+                    completed_time_val = nearest["completed_time"] or ""
+                    week_status = {
+                        "status": status_val,
+                        "completed_date": completed_date_val,
+                        "completed_time": completed_time_val,
+                    }
+                    items.append(misc_row_to_dict(row, week_status))
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO misc_week_status (task_id, year, week, status, completed_date, completed_time)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (task_id, year, week, status_val, completed_date_val, completed_time_val))
+                    made_changes = True
+            if made_changes:
+                conn.commit()
+                last_modified = os.path.getmtime(DB_PATH)
+        elif items_without_status and is_year_mode:
+            for row in items_without_status:
+                task_id = row["id"]
+                cursor.execute("""
+                    SELECT status, completed_date, completed_time
+                    FROM misc_week_status
+                    WHERE task_id = ?
+                    ORDER BY year DESC, week DESC
+                    LIMIT 1
+                """, (task_id,))
+                nearest = cursor.fetchone()
+                if nearest:
+                    week_status = {
+                        "status": nearest["status"] or "",
+                        "completed_date": nearest["completed_date"] or "",
+                        "completed_time": nearest["completed_time"] or "",
+                    }
+                    items.append(misc_row_to_dict(row, week_status))
+                else:
+                    items.append(misc_row_to_dict(row, None))
+
+        conn.close()
+        return items, last_modified
+
+    def handle_save_misc_data(self, year, week, new_item, old_item_no, is_update):
+        task_no = new_item.get("Task No.", "").strip()
+        title = new_item.get("Title", "").strip()
+        assigned_team = new_item.get("Assigned Team", "").strip()
+        assigned_by = new_item.get("Assigned By", "").strip()
+
+        if not task_no or not title or not assigned_team or not assigned_by:
+            self.send_response(400)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "error": "Task No., Title, Assigned Team, and Assigned By are required"
+            }).encode())
+            return
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT COUNT(*) as cnt FROM misc_week_status WHERE year = ? AND week = ?",
+            (year, week)
+        )
+        count = cursor.fetchone()['cnt']
+
+        if count == 0 and not is_update:
+            carried_items = misc_carry_over_from_previous(year, week)
+            for item in carried_items:
+                t_no = item.get("Task No.", "")
+                task_id = get_misc_task_id(cursor, t_no)
+                if not task_id:
+                    item_col_names = ["task_no"] + MISC_CORE_FIELDS
+                    placeholders = ", ".join(["?"] * len(item_col_names))
+                    item_values = [t_no] + misc_dict_core_values(item)
+                    cursor.execute(
+                        f"INSERT INTO misc_tasks ({', '.join(item_col_names)}) VALUES ({placeholders})",
+                        tuple(item_values)
+                    )
+                    task_id = cursor.lastrowid
+                normalized_completed_time = normalize_time_to_24h(item.get("Completed Time", ""))
+                cursor.execute("""
+                    INSERT OR REPLACE INTO misc_week_status (task_id, year, week, status, completed_date, completed_time)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (task_id, year, week,
+                      item.get("Status", "Open"),
+                      item.get("Completed Date", ""),
+                      normalized_completed_time))
+
+        if old_item_no and old_item_no != task_no:
+            old_task_id = get_misc_task_id(cursor, old_item_no)
+            if old_task_id:
+                cursor.execute("DELETE FROM misc_tasks WHERE id = ?", (old_task_id,))
+
+        task_id = get_misc_task_id(cursor, task_no)
+
+        if not is_update and not old_item_no and task_id:
+            conn.close()
+            self.send_response(409)
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": "Task Number already exists"}).encode())
+            return
+
+        if task_id:
+            changed = False
+            cursor.execute(f"SELECT {', '.join(MISC_CORE_FIELDS)} FROM misc_tasks WHERE id = ?", (task_id,))
+            existing_item = cursor.fetchone()
+            if existing_item:
+                for i, col in enumerate(MISC_CORE_FIELDS):
+                    csv_col = MISC_DB_TO_CSV.get(col)
+                    if csv_col:
+                        new_val = str(new_item.get(csv_col, "")).strip()
+                        db_val = str(existing_item[i] if existing_item[i] is not None else "").strip()
+                        if new_val != db_val:
+                            changed = True
+                            break
+            if not changed:
+                cursor.execute("""
+                    SELECT status, completed_date, completed_time
+                    FROM misc_week_status WHERE task_id = ? AND year = ? AND week = ?
+                """, (task_id, year, week))
+                existing_status = cursor.fetchone()
+                if not existing_status:
+                    changed = True
+                else:
+                    new_status = str(new_item.get("Status", "")).strip()
+                    db_status = str(existing_status["status"] or "").strip()
+                    new_completed_date = str(new_item.get("Completed Date", "")).strip()
+                    db_completed_date = str(existing_status["completed_date"] or "").strip()
+                    new_completed_time = str(new_item.get("Completed Time", "")).strip()
+                    db_completed_time = str(existing_status["completed_time"] or "").strip()
+                    if (new_status != db_status or new_completed_date != db_completed_date or
+                            new_completed_time != db_completed_time):
+                        changed = True
+            if changed:
+                update_parts = []
+                values = []
+                for col in MISC_CORE_FIELDS:
+                    csv_col = MISC_DB_TO_CSV.get(col)
+                    if csv_col:
+                        update_parts.append(f"{col} = ?")
+                        val = new_item.get(csv_col, "")
+                        if col in MISC_DATE_FIELDS:
+                            val = normalize_date(val)
+                        elif col in MISC_TIME_FIELDS:
+                            val = normalize_time_to_24h(val)
+                        values.append(val)
+                values.append(task_id)
+                cursor.execute(
+                    f"UPDATE misc_tasks SET {', '.join(update_parts)} WHERE id = ?",
+                    values
+                )
+                normalized_completed_time = normalize_time_to_24h(new_item.get("Completed Time", ""))
+                cursor.execute("""
+                    INSERT OR REPLACE INTO misc_week_status (task_id, year, week, status, completed_date, completed_time)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (task_id, year, week,
+                      new_item.get("Status", "Open"),
+                      new_item.get("Completed Date", ""),
+                      normalized_completed_time))
+                os.utime(DB_PATH, None)
+        else:
+            item_col_names = ["task_no"] + MISC_CORE_FIELDS
+            placeholders = ", ".join(["?"] * len(item_col_names))
+            item_values = [task_no] + misc_dict_core_values(new_item)
+            cursor.execute(
+                f"INSERT INTO misc_tasks ({', '.join(item_col_names)}) VALUES ({placeholders})",
+                tuple(item_values)
+            )
+            task_id = cursor.lastrowid
+            normalized_completed_time = normalize_time_to_24h(new_item.get("Completed Time", ""))
+            cursor.execute("""
+                INSERT OR REPLACE INTO misc_week_status (task_id, year, week, status, completed_date, completed_time)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (task_id, year, week,
+                  new_item.get("Status", "Open"),
+                  new_item.get("Completed Date", ""),
+                  normalized_completed_time))
+            os.utime(DB_PATH, None)
+
+        conn.commit()
+        conn.close()
+        self.send_response(200)
+        self.end_headers()
+
     def handle_get_data(self, query):
         import json
         from datetime import datetime
@@ -971,6 +1548,21 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                 "data_type": data_type,
                 "last_modified": 0,
                 "db_initialized": False
+            }).encode())
+            return
+
+        if data_type == "Miscellaneous":
+            items, last_modified = self.handle_get_misc_data(year, week, is_year_mode)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "items": items,
+                "current_year": year,
+                "current_week": week,
+                "data_type": data_type,
+                "last_modified": last_modified,
+                "db_initialized": True
             }).encode())
             return
 
@@ -1223,6 +1815,10 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
         # Ensure database exists
         if not db_exists():
             init_db()
+
+        if data_type == "Miscellaneous":
+            self.handle_save_misc_data(year, week, new_item, old_item_no, is_update)
+            return
         
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -1413,6 +2009,22 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
 
+    def read_misc_csv(self, file_path):
+        if not os.path.exists(file_path):
+            return []
+        try:
+            with open(file_path, mode='r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                tasks = []
+                for row in reader:
+                    for col in MISC_COLUMNS:
+                        if col not in row:
+                            row[col] = ""
+                    tasks.append(row)
+                return tasks
+        except PermissionError:
+            return None
+
     def handle_export(self, query):
         params = urllib.parse.parse_qs(query)
         year = params.get("year", [""])[0]
@@ -1423,6 +2035,74 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
         # Check if database exists
         if not db_exists():
             self.send_error(404, "Database not initialized")
+            return
+
+        if data_type == "Miscellaneous":
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            if range_type == "all":
+                cursor.execute("""
+                    SELECT t.*, ws.status, ws.completed_date, ws.completed_time
+                    FROM misc_tasks t
+                    LEFT JOIN (
+                        SELECT task_id, status, completed_date, completed_time,
+                               ROW_NUMBER() OVER (PARTITION BY task_id ORDER BY year DESC, week DESC) as rn
+                        FROM misc_week_status
+                    ) ws ON t.id = ws.task_id AND ws.rn = 1
+                """)
+                filename = "All_Miscellaneous.csv"
+            else:
+                cursor.execute("""
+                    SELECT t.*, ws.status, ws.completed_date, ws.completed_time
+                    FROM misc_tasks t
+                    INNER JOIN misc_week_status ws ON t.id = ws.task_id
+                    WHERE ws.year = ? AND ws.week = ?
+                """, (int(year), int(week)))
+                filename = f"Miscellaneous_Status_{year}_Week_{week}.csv"
+            rows = cursor.fetchall()
+            actions = []
+            for row in rows:
+                week_status = {
+                    "status": row["status"],
+                    "completed_date": row["completed_date"],
+                    "completed_time": row["completed_time"],
+                }
+                task_dict = misc_row_to_dict(row, week_status)
+                if range_type != "all":
+                    start_date_str = task_dict.get("Created Date", "")
+                    if start_date_str and start_date_str != "N/A":
+                        start_date = self.parse_date(start_date_str)
+                        if start_date:
+                            target_year = int(year)
+                            year_start = datetime(target_year, 1, 1)
+                            first_sunday = year_start + timedelta(days=(7 - year_start.weekday()) % 7)
+                            if year_start.weekday() == 6:
+                                first_sunday = year_start
+                            week_end = first_sunday + timedelta(days=int(week) * 7 - 1)
+                            if start_date > week_end:
+                                continue
+                    if misc_is_closed(task_dict):
+                        end_date_str = task_dict.get("Completed Date", "")
+                        if end_date_str and end_date_str != "N/A":
+                            end_date = self.parse_date(end_date_str)
+                            if end_date:
+                                end_year, end_week = self.get_week_year(end_date)
+                                if end_year != int(year) or end_week != int(week):
+                                    continue
+                actions.append(task_dict)
+            conn.close()
+            output = io.StringIO()
+            writer = csv.DictWriter(
+                output, fieldnames=MISC_COLUMNS, extrasaction='ignore', quoting=csv.QUOTE_ALL
+            )
+            writer.writeheader()
+            writer.writerows(actions)
+            csv_content = output.getvalue().encode('utf-8-sig')
+            self.send_response(200)
+            self.send_header("Content-Type", "text/csv")
+            self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+            self.end_headers()
+            self.wfile.write(csv_content)
             return
 
         conn = get_db_connection()
@@ -1440,8 +2120,7 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                 ) ws ON a.id = ws.action_id AND ws.rn = 1
                 WHERE a.data_type = ?
             """, (data_type,))
-            # Handle pluralization properly (Crisis -> Crises, Incident -> Incidents)
-            plural_type = "Crises" if data_type == "Crisis" else f"{data_type}s"
+            plural_type = EXPORT_PLURAL.get(data_type, f"{data_type}s")
             filename = f"All_{plural_type}.csv"
         else:
             # Query for specific week - only get items that have a status entry for this week

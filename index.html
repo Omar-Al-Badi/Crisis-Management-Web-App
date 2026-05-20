@@ -37,13 +37,13 @@
                 <p id="reporting-period">Current reporting period: Loading...</p>
             </div>
             <div class="type-selector">
-                <div class="segmented-control">
+                <div class="segmented-control main-type-selector">
                     <input type="radio" name="data-type" id="type-incident" value="Incident" checked>
                     <label for="type-incident">Incidents</label>
                     <input type="radio" name="data-type" id="type-crisis" value="Crisis">
                     <label for="type-crisis">Crises</label>
-                    <!-- <input type="radio" name="data-type" id="type-action" value="Action">
-                    <label for="type-action">Action Items</label> -->
+                    <input type="radio" name="data-type" id="type-miscellaneous" value="Miscellaneous">
+                    <label for="type-miscellaneous">Miscellaneous</label>
                     <div class="selection-slider"></div>
                 </div>
             </div>
@@ -79,6 +79,13 @@
                 <div class="stat-label">Closed Incidents</div>
                 <div class="stat-value">0</div>
             </div>
+        </div>
+
+        <div id="db-init-banner" class="db-init-banner" style="display: none; margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 8px; background: #fef3c7; color: #92400e; border: 1px solid #fcd34d;">
+            Database not initialized. Click <strong>Initialize Database</strong> (refresh icon in the toolbar) to load existing CSV data, or import a CSV for this week.
+        </div>
+        <div id="empty-week-hint" class="empty-week-hint" style="display: none; margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 8px; background: var(--hover-bg); color: var(--text-muted); border: 1px solid var(--border);">
+            No items for this week. Use the week arrows to view other weeks where data may exist.
         </div>
 
         <div class="table-toolbar">
@@ -219,6 +226,7 @@
                 <span class="close-modal">&times;</span>
             </div>
             <form id="add-action-form">
+                <div id="add-incident-fields">
                 <div class="form-grid">
                     <div class="form-group">
                         <label class="form-label" for="new-action-no">Incident No.</label>
@@ -347,6 +355,54 @@
                 <div class="form-group" style="margin-top: 1rem;">
                     <label class="form-label" for="new-description">Description</label>
                     <textarea id="new-description" class="form-control" placeholder="Enter description of the incident..."></textarea>
+                </div>
+                </div>
+                <div id="add-misc-fields" style="display: none;">
+                    <div class="form-grid add-misc-form-row add-misc-form-row-1">
+                        <div class="form-group">
+                            <label class="form-label" for="new-misc-task-no">Task No.</label>
+                            <input type="text" id="new-misc-task-no" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="new-misc-title">Title</label>
+                            <input type="text" id="new-misc-title" class="form-control" placeholder="Task summary" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="new-misc-team">Assigned Team</label>
+                            <input type="text" id="new-misc-team" class="form-control" placeholder="e.g. Network Operations" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="new-misc-assigned-by">Assigned By</label>
+                            <input type="text" id="new-misc-assigned-by" class="form-control" placeholder="e.g. GM" required>
+                        </div>
+                    </div>
+                    <div class="form-grid add-misc-form-row add-misc-form-row-2">
+                        <div class="form-group">
+                            <label class="form-label" for="new-misc-created-date-display">Created Date</label>
+                            <div style="position: relative;">
+                                <input type="text" id="new-misc-created-date-display" class="form-control" placeholder="dd/mm/yyyy" required>
+                                <input type="date" id="new-misc-created-date-hidden" style="position: absolute; top: 0; left: 0; opacity: 0; width: 100%; height: 100%; pointer-events: none;">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="new-misc-created-time">Created Time</label>
+                            <div class="input-with-btn">
+                                <input type="time" id="new-misc-created-time" class="form-control" required>
+                                <button type="button" class="btn-now" data-target="new-misc-created-time">Now</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="new-misc-due-date-display">Due Date</label>
+                            <div style="position: relative;">
+                                <input type="text" id="new-misc-due-date-display" class="form-control" placeholder="dd/mm/yyyy">
+                                <input type="date" id="new-misc-due-date-hidden" style="position: absolute; top: 0; left: 0; opacity: 0; width: 100%; height: 100%; pointer-events: none;">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label class="form-label" for="new-misc-description">Description</label>
+                        <textarea id="new-misc-description" class="form-control" placeholder="Task details..."></textarea>
+                    </div>
                 </div>
                 <div class="form-actions" style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: flex-end;">
                     <button type="button" class="btn btn-secondary close-modal">Cancel</button>
@@ -485,9 +541,68 @@
         let currentPage = 1; // Pagination state
         let currentSortColumn = 1; // Default sort by Incident No.
         let currentSortOrder = 'asc'; // Default sort order
+        const DEFAULT_MISC_VISIBLE_COLUMNS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+        let savedIncidentVisibleColumns = null;
+
+        function isMiscMode() {
+            return currentDataType === 'Miscellaneous';
+        }
+
+        function getItemNo(item) {
+            return isMiscMode() ? (item['Task No.'] || '') : (item['Action No.'] || '');
+        }
+
+        function getItemStartDateField(item) {
+            return isMiscMode() ? 'Created Date' : 'Action Start Date';
+        }
+
+        function getItemEndDateField(item) {
+            return isMiscMode() ? 'Completed Date' : 'End Date';
+        }
+
+        function getItemStatusField(item) {
+            return isMiscMode() ? 'Status' : 'Action Status';
+        }
+
+        function isoToDMY(isoStr) {
+            if (!isoStr) return '';
+            const [year, month, day] = isoStr.split('-');
+            return `${day}/${month}/${year}`;
+        }
+
+        function dmyToISO(dmyStr) {
+            if (!dmyStr) return '';
+            const parts = dmyStr.split('/');
+            if (parts.length !== 3) return '';
+            const [day, month, year] = parts;
+            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+
+        function getTodayISO() {
+            return new Date().toISOString().split('T')[0];
+        }
 
         document.addEventListener('DOMContentLoaded', function() {
             console.log('DOM Content Loaded');
+
+            const weekPickerHidden = document.getElementById('week-picker-hidden');
+            const weekPickerDisplay = document.getElementById('week-picker-display');
+            const reportingPeriod = document.getElementById('reporting-period');
+            const detailsContainer = document.querySelector('.incident-details');
+            const detailModal = document.getElementById('incident-detail-modal');
+            const dbInitBanner = document.getElementById('db-init-banner');
+            const emptyWeekHint = document.getElementById('empty-week-hint');
+
+            const DEFAULT_VISIBLE_DATA_COLUMNS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+            let visibleColumnsRaw = JSON.parse(localStorage.getItem('visibleColumns'));
+            let visibleColumns = Array.isArray(visibleColumnsRaw) && visibleColumnsRaw.length
+                ? visibleColumnsRaw.filter(c => typeof c === 'number' && c >= 1 && c <= 16)
+                : DEFAULT_VISIBLE_DATA_COLUMNS.slice();
+            if (!visibleColumns.length) {
+                visibleColumns = DEFAULT_VISIBLE_DATA_COLUMNS.slice();
+            }
+            localStorage.setItem('visibleColumns', JSON.stringify(visibleColumns));
+
             // --- Add New Incident Modal Logic ---
             const addActionBtn = document.getElementById('add-action-btn');
             const addActionModal = document.getElementById('add-action-modal');
@@ -498,14 +613,50 @@
             const newStartDateDisplay = document.getElementById('new-start-date-display');
             const newTargetDateHidden = document.getElementById('new-target-date-hidden');
             const newTargetDateDisplay = document.getElementById('new-target-date-display');
+            const newMiscTaskNoInput = document.getElementById('new-misc-task-no');
+            const newMiscCreatedDateHidden = document.getElementById('new-misc-created-date-hidden');
+            const newMiscCreatedDateDisplay = document.getElementById('new-misc-created-date-display');
+            const newMiscDueDateHidden = document.getElementById('new-misc-due-date-hidden');
+            const newMiscDueDateDisplay = document.getElementById('new-misc-due-date-display');
+            const newMiscAssignedBy = document.getElementById('new-misc-assigned-by');
 
             // Setup dual pickers for new incident form
             setupDualDatePicker(newStartDateDisplay, newStartDateHidden);
             setupDualDatePicker(newTargetDateDisplay, newTargetDateHidden);
+            setupDualDatePicker(newMiscCreatedDateDisplay, newMiscCreatedDateHidden);
+            setupDualDatePicker(newMiscDueDateDisplay, newMiscDueDateHidden);
+
+            if (newMiscAssignedBy) {
+                const savedName = localStorage.getItem('displayName');
+                if (savedName) newMiscAssignedBy.value = savedName;
+            }
 
             if (addActionBtn) {
                 addActionBtn.addEventListener('click', () => {
                     console.log('Add button clicked');
+                    const now = new Date();
+                    const todayISO = now.toISOString().split('T')[0];
+                    const hh24 = String(now.getHours()).padStart(2, '0');
+                    const mm = String(now.getMinutes()).padStart(2, '0');
+
+                    if (isMiscMode()) {
+                        const maxId = (currentItems || []).reduce((max, a) => {
+                            const id = parseInt(a['Task No.']);
+                            return !isNaN(id) && id > max ? id : max;
+                        }, 0);
+                        if (newMiscTaskNoInput) newMiscTaskNoInput.value = maxId + 1;
+                        if (newMiscCreatedDateHidden) newMiscCreatedDateHidden.value = todayISO;
+                        if (newMiscCreatedDateDisplay) newMiscCreatedDateDisplay.value = isoToDMY(todayISO);
+                        const miscTimeEl = document.getElementById('new-misc-created-time');
+                        if (miscTimeEl) miscTimeEl.value = `${hh24}:${mm}`;
+                        if (newMiscAssignedBy && !newMiscAssignedBy.value) {
+                            const savedName = localStorage.getItem('displayName');
+                            if (savedName) newMiscAssignedBy.value = savedName;
+                        }
+                        if (addActionModal) addActionModal.style.display = 'block';
+                        return;
+                    }
+
                     // Auto-generate Action ID
                     const maxId = (currentItems || []).reduce((max, a) => {
                         const id = parseInt(a['Action No.']);
@@ -514,17 +665,11 @@
                     if (newActionNoInput) newActionNoInput.value = maxId + 1;
                     
                     // Set default start date and time to now
-                    const now = new Date();
-                    const todayISO = now.toISOString().split('T')[0];
-                    const currentTime = getCurrentTime(); // hh:mm AM/PM
-                    
                     if (newStartDateHidden) newStartDateHidden.value = todayISO;
                     if (newStartDateDisplay) newStartDateDisplay.value = isoToDMY(todayISO);
                     const startTimeEl = document.getElementById('new-start-time');
                     if (startTimeEl) {
                         // For <input type="time">, we still need 24h format HH:mm
-                        const hh24 = String(now.getHours()).padStart(2, '0');
-                        const mm = String(now.getMinutes()).padStart(2, '0');
                         startTimeEl.value = `${hh24}:${mm}`;
                     }
                     
@@ -535,6 +680,47 @@
             if (addActionForm) {
                 addActionForm.addEventListener('submit', async (e) => {
                     e.preventDefault();
+
+                    if (isMiscMode()) {
+                        const taskNo = newMiscTaskNoInput ? newMiscTaskNoInput.value.trim() : '';
+                        const title = document.getElementById('new-misc-title')?.value.trim() || '';
+                        const team = document.getElementById('new-misc-team')?.value.trim() || '';
+                        const assignedBy = newMiscAssignedBy?.value.trim() || '';
+                        if (!taskNo || !title || !team || !assignedBy) {
+                            showNotification('Error', 'Task No., Title, Assigned Team, and Assigned By are required.');
+                            return;
+                        }
+                        const gmName = assignedBy;
+                        localStorage.setItem('displayName', gmName);
+                        const createdDate = newMiscCreatedDateHidden ? newMiscCreatedDateHidden.value : '';
+                        const createdTime = document.getElementById('new-misc-created-time')?.value || '';
+                        const dueDate = newMiscDueDateHidden ? newMiscDueDateHidden.value : '';
+                        const description = document.getElementById('new-misc-description')?.value.trim() || '';
+                        const newTask = {
+                            "Task No.": taskNo,
+                            "Title": title,
+                            "Description": description,
+                            "Assigned Team": team,
+                            "Assigned By": assignedBy,
+                            "Status": "Open",
+                            "Created Date": createdDate,
+                            "Created Time": createdTime,
+                            "Due Date": dueDate,
+                            "Remarks": "",
+                            "Completed Date": "",
+                            "Completed Time": ""
+                        };
+                        try {
+                            await saveActionUpdate(newTask, null, false);
+                            if (addActionModal) addActionModal.style.display = 'none';
+                            addActionForm.reset();
+                            if (newMiscAssignedBy) newMiscAssignedBy.value = gmName;
+                            loadDashboardData(getWeekPickerDateStr());
+                        } catch (err) {
+                            console.log('Misc task submission failed:', err.message);
+                        }
+                        return;
+                    }
                     
                     const actionNo = newActionNoInput ? newActionNoInput.value.trim() : '';
                     if (!actionNo) {
@@ -630,7 +816,7 @@
                         // Hide modal and refresh
                         if (addActionModal) addActionModal.style.display = 'none';
                         addActionForm.reset();
-                        loadDashboardData(weekPickerHidden.value);
+                        loadDashboardData(getWeekPickerDateStr());
                     } catch (err) {
                         // Error already handled in saveActionUpdate (notification shown)
                         console.log('Form submission failed:', err.message);
@@ -654,36 +840,150 @@
                 });
             });
 
-            // --- Type Selection Logic ---
-            const typeRadios = document.querySelectorAll('input[name="data-type"]');
-            typeRadios.forEach(radio => {
-                radio.addEventListener('change', (e) => {
-                    currentDataType = e.target.value;
-                    currentPage = 1; // Reset to first page when data type changes
-                    updateDynamicLabels();
-                    loadDashboardData(weekPickerHidden.value);
-                });
-            });
+            function updateTableForDataType() {
+                const thead = document.querySelector('thead tr');
+                const dropdown = document.getElementById('column-dropdown');
+                const addIncidentFields = document.getElementById('add-incident-fields');
+                const addMiscFields = document.getElementById('add-misc-fields');
 
-            // --- Time Period Selection Logic ---
-            window.currentTimePeriod = 'Week';
-            const periodRadios = document.querySelectorAll('input[name="time-period"]');
-            const calendarControls = document.querySelector('.calendar-controls');
-            
-            periodRadios.forEach(radio => {
-                radio.addEventListener('change', (e) => {
-                    window.currentTimePeriod = e.target.value;
-                    if (window.currentTimePeriod === 'Year') {
-                        calendarControls.style.visibility = 'hidden';
-                        calendarControls.style.pointerEvents = 'none';
-                    } else {
-                        calendarControls.style.visibility = 'visible';
-                        calendarControls.style.pointerEvents = 'auto';
+                if (isMiscMode()) {
+                    if (!savedIncidentVisibleColumns) {
+                        savedIncidentVisibleColumns = JSON.parse(localStorage.getItem('visibleColumns') || '[]');
                     }
-                    updateDynamicLabels();
-                    loadDashboardData(weekPickerHidden.value);
+                    visibleColumns = DEFAULT_MISC_VISIBLE_COLUMNS.slice();
+                    localStorage.setItem('visibleColumns', JSON.stringify(visibleColumns));
+
+                    if (thead) {
+                        thead.innerHTML = `
+                            <th data-column="0" style="width: 40px;"></th>
+                            <th data-column="1">Task No.</th>
+                            <th data-column="2">Title</th>
+                            <th data-column="3">Description</th>
+                            <th data-column="4">Assigned Team</th>
+                            <th data-column="5">Assigned By</th>
+                            <th data-column="6">Status</th>
+                            <th data-column="7">Due Date</th>
+                            <th data-column="8">Created Date</th>
+                            <th data-column="9">Age</th>
+                        `;
+                    }
+                    if (dropdown) {
+                        dropdown.innerHTML = `
+                            <label class="column-option"><input type="checkbox" checked data-column="1"> Task No.</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="2"> Title</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="3"> Description</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="4"> Assigned Team</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="5"> Assigned By</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="6"> Status</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="7"> Due Date</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="8"> Created Date</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="9"> Age</label>
+                        `;
+                        wireColumnVisibilityCheckboxes(dropdown);
+                    }
+                    if (addIncidentFields) addIncidentFields.style.display = 'none';
+                    if (addMiscFields) addMiscFields.style.display = 'block';
+                } else {
+                    if (savedIncidentVisibleColumns) {
+                        visibleColumns = savedIncidentVisibleColumns.filter(c => c >= 1 && c <= 16);
+                        savedIncidentVisibleColumns = null;
+                        localStorage.setItem('visibleColumns', JSON.stringify(visibleColumns));
+                    }
+                    if (thead) {
+                        let singular = currentDataType === 'Crisis' ? 'Crisis' : 'Incident';
+                        thead.innerHTML = `
+                            <th data-column="0" style="width: 40px;"></th>
+                            <th data-column="1">${singular} No.</th>
+                            <th data-column="2">ITSM Ticket</th>
+                            <th data-column="3">Crisis/Incident</th>
+                            <th data-column="4">Description</th>
+                            <th data-column="5">System</th>
+                            <th data-column="6">Owner</th>
+                            <th data-column="7">${singular} Status</th>
+                            <th data-column="8">${singular} Start Date</th>
+                            <th data-column="9">Start Time</th>
+                            <th data-column="10">Target Date</th>
+                            <th data-column="11">Closure Date</th>
+                            <th data-column="12">End Time</th>
+                            <th data-column="13">Age</th>
+                            <th data-column="14">TTA</th>
+                            <th data-column="15">TTR</th>
+                            <th data-column="16">TTD</th>
+                        `;
+                    }
+                    if (dropdown) {
+                        const singular = currentDataType === 'Crisis' ? 'Crisis' : 'Incident';
+                        dropdown.innerHTML = `
+                            <label class="column-option"><input type="checkbox" checked data-column="1"> ${singular} No.</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="2"> ITSM Ticket</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="3"> Crisis/Incident</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="4"> Description</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="5"> System</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="6"> Owner</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="7"> Status</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="8"> Start Date</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="9"> Start Time</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="10"> Target Date</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="11"> Closure Date</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="12"> End Time</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="13"> Age</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="14"> TTA</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="15"> TTR</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="16"> TTD</label>
+                        `;
+                        wireColumnVisibilityCheckboxes(dropdown);
+                    }
+                    if (addIncidentFields) addIncidentFields.style.display = 'block';
+                    if (addMiscFields) addMiscFields.style.display = 'none';
+                }
+                applyColumnVisibility();
+                wireTableHeaderSorting();
+            }
+
+            function wireColumnVisibilityCheckboxes(dropdown) {
+                if (!dropdown) return;
+                dropdown.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                    const colIndex = parseInt(cb.getAttribute('data-column'));
+                    if (!isNaN(colIndex)) cb.checked = visibleColumns.includes(colIndex);
+                    cb.addEventListener('change', () => {
+                        const idx = parseInt(cb.getAttribute('data-column'));
+                        if (cb.checked) {
+                            if (!visibleColumns.includes(idx)) visibleColumns.push(idx);
+                        } else {
+                            visibleColumns = visibleColumns.filter(i => i !== idx);
+                        }
+                        localStorage.setItem('visibleColumns', JSON.stringify(visibleColumns));
+                        applyColumnVisibility();
+                    });
                 });
-            });
+            }
+
+            function wireTableHeaderSorting() {
+                const headers = document.querySelectorAll('thead th');
+                const sortableIncident = [1, 8, 10, 11, 13];
+                const sortableMisc = [1, 7, 8, 9];
+                const sortableColumns = isMiscMode() ? sortableMisc : sortableIncident;
+                headers.forEach(th => {
+                    th.replaceWith(th.cloneNode(true));
+                });
+                document.querySelectorAll('thead th').forEach(th => {
+                    th.addEventListener('click', () => {
+                        const colIndex = parseInt(th.getAttribute('data-column'));
+                        if (isNaN(colIndex) || !sortableColumns.includes(colIndex)) return;
+                        if (currentSortColumn === colIndex) {
+                            currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+                        } else {
+                            currentSortColumn = colIndex;
+                            currentSortOrder = 'asc';
+                        }
+                        document.querySelectorAll('thead th').forEach(header => {
+                            header.classList.remove('sort-asc', 'sort-desc');
+                        });
+                        th.classList.add(currentSortOrder === 'asc' ? 'sort-asc' : 'sort-desc');
+                        updateDashboardUI(currentItems);
+                    });
+                });
+            }
 
             function updateDynamicLabels() {
                 let singular, plural;
@@ -693,6 +993,9 @@
                 } else if (currentDataType === 'Action') {
                     singular = 'Action Item';
                     plural = 'Action Items';
+                } else if (currentDataType === 'Miscellaneous') {
+                    singular = 'Task';
+                    plural = 'Miscellaneous';
                 } else {
                     singular = 'Incident';
                     plural = 'Incidents';
@@ -712,37 +1015,18 @@
                     refGroup.style.display = currentDataType === 'Action' ? 'block' : 'none';
                 }
 
-                // Update table headers
-                const headers = document.querySelectorAll('thead th');
-                if (headers.length > 8) {
-                    headers[1].textContent = `${singular} No.`;
-                    headers[3].textContent = singular;
-                    headers[7].textContent = `${singular} Status`;
-                    headers[8].textContent = `${singular} Start Date`;
-                }
-
-                // Update column visibility dropdown labels
-                const dropdown = document.getElementById('column-dropdown');
-                if (dropdown) {
-                    const updateDropdownLabel = (col, text) => {
-                        const cb = dropdown.querySelector(`input[data-column="${col}"]`);
-                        if (cb && cb.nextSibling) cb.nextSibling.textContent = ` ${text}`;
-                    };
-                    updateDropdownLabel("1", `${singular} No.`);
-                    updateDropdownLabel("2", "ITSM Ticket");
-                    updateDropdownLabel("3", singular);
-                    updateDropdownLabel("7", "Status");
-                    updateDropdownLabel("8", "Start Date");
-                }
+                updateTableForDataType();
 
                 // Update modal labels
                 const addModal = document.getElementById('add-action-modal');
                 if (addModal) {
                     addModal.querySelector('h3').textContent = `Add New ${singular}`;
-                    addModal.querySelector('label[for="new-action-no"]').textContent = `${singular} No.`;
-                    const crisisLabel = addModal.querySelector('label[for="new-crisis"]');
-                    if (crisisLabel) crisisLabel.textContent = singular;
-                    addModal.querySelector('label[for="new-start-date-display"]').textContent = `${singular} Start Date`;
+                    if (!isMiscMode()) {
+                        addModal.querySelector('label[for="new-action-no"]').textContent = `${singular} No.`;
+                        const crisisLabel = addModal.querySelector('label[for="new-crisis"]');
+                        if (crisisLabel) crisisLabel.textContent = singular;
+                        addModal.querySelector('label[for="new-start-date-display"]').textContent = `${singular} Start Date`;
+                    }
                     const saveBtn = document.getElementById('save-action-btn');
                     if (saveBtn) saveBtn.textContent = `Save ${singular}`;
                 }
@@ -750,7 +1034,7 @@
                 if (detailModal) {
                     const detailModalHeader = detailModal.querySelector('h3');
                     if (detailModalHeader) {
-                        detailModalHeader.textContent = `${singular} Detailed View`;
+                        detailModalHeader.textContent = isMiscMode() ? 'Task Detailed View' : `${singular} Detailed View`;
                     }
                 }
             }
@@ -810,7 +1094,6 @@
 
             // --- Dashboard Data Logic ---
             const viewModeBtn = document.getElementById('view-mode-btn');
-            const weekPickerDisplay = document.getElementById('week-picker-display');
 
             const storedFilterOut = localStorage.getItem(FILTER_OUT_HIDDEN_ROWS_KEY);
             filterOutHiddenRows = storedFilterOut === null ? true : storedFilterOut === 'true';
@@ -837,25 +1120,23 @@
             }
             syncViewModeButton();
 
-            viewModeBtn.addEventListener('click', () => {
-                filterOutHiddenRows = !filterOutHiddenRows;
-                localStorage.setItem(FILTER_OUT_HIDDEN_ROWS_KEY, String(filterOutHiddenRows));
-                syncViewModeButton();
-                if (typeof currentItems !== 'undefined' && currentItems) {
-                    updateDashboardUI(currentItems);
-                }
-            });
+            if (viewModeBtn) {
+                viewModeBtn.addEventListener('click', () => {
+                    filterOutHiddenRows = !filterOutHiddenRows;
+                    localStorage.setItem(FILTER_OUT_HIDDEN_ROWS_KEY, String(filterOutHiddenRows));
+                    syncViewModeButton();
+                    if (typeof currentItems !== 'undefined' && currentItems) {
+                        updateDashboardUI(currentItems);
+                    }
+                });
+            }
 
-            const weekPickerHidden = document.getElementById('week-picker-hidden');
-            const reportingPeriod = document.getElementById('reporting-period');
-            const detailsContainer = document.querySelector('.incident-details');
-            const detailModal = document.getElementById('incident-detail-modal');
             const closeDetailModalBtn = document.getElementById('close-detail-modal');
 
             // --- Column Visibility Logic ---
             const columnsBtn = document.getElementById('columns-btn');
             const columnDropdown = document.getElementById('column-dropdown');
-            const columnCheckboxes = columnDropdown.querySelectorAll('input[type="checkbox"]');
+            const columnCheckboxes = columnDropdown ? columnDropdown.querySelectorAll('input[type="checkbox"]') : [];
             
             // --- Sorting Logic ---
             const tableHeaders = document.querySelectorAll('thead th');
@@ -883,19 +1164,9 @@
                 });
             });
 
-            // Data columns 1–16 only; column 0 (row actions) is always shown and not in this list
-            const DEFAULT_VISIBLE_DATA_COLUMNS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
-            let visibleColumnsRaw = JSON.parse(localStorage.getItem('visibleColumns'));
-            let visibleColumns = Array.isArray(visibleColumnsRaw) && visibleColumnsRaw.length
-                ? visibleColumnsRaw.filter(c => typeof c === 'number' && c >= 1 && c <= 16)
-                : DEFAULT_VISIBLE_DATA_COLUMNS.slice();
-            if (!visibleColumns.length) {
-                visibleColumns = DEFAULT_VISIBLE_DATA_COLUMNS.slice();
-            }
-            localStorage.setItem('visibleColumns', JSON.stringify(visibleColumns));
-            
             function applyColumnVisibility() {
                 const table = document.querySelector('table');
+                if (!table) return;
                 const rows = table.querySelectorAll('tr');
                 const visibleColSpan = 1 + visibleColumns.length;
                 
@@ -920,16 +1191,21 @@
                 });
                 
                 // Update checkboxes in dropdown
-                columnCheckboxes.forEach(cb => {
-                    const colIndex = parseInt(cb.getAttribute('data-column'));
-                    cb.checked = visibleColumns.includes(colIndex);
-                });
+                const dropdownEl = document.getElementById('column-dropdown');
+                if (dropdownEl) {
+                    dropdownEl.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                        const colIndex = parseInt(cb.getAttribute('data-column'));
+                        cb.checked = visibleColumns.includes(colIndex);
+                    });
+                }
             }
 
-            columnsBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                columnDropdown.classList.toggle('show');
-            });
+            if (columnsBtn && columnDropdown) {
+                columnsBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    columnDropdown.classList.toggle('show');
+                });
+            }
 
             columnCheckboxes.forEach(cb => {
                 cb.addEventListener('change', () => {
@@ -948,7 +1224,7 @@
 
             // Close dropdown when clicking outside
             window.addEventListener('click', (event) => {
-                if (!columnDropdown.contains(event.target) && event.target !== columnsBtn) {
+                if (columnDropdown && columnsBtn && !columnDropdown.contains(event.target) && event.target !== columnsBtn) {
                     columnDropdown.classList.remove('show');
                 }
             });
@@ -956,23 +1232,18 @@
             // Initial application
             applyColumnVisibility();
             
-            // Date formatting helpers
-            function isoToDMY(isoStr) {
-                if (!isoStr) return '';
-                const [year, month, day] = isoStr.split('-');
-                return `${day}/${month}/${year}`;
-            }
-
-            function dmyToISO(dmyStr) {
-                if (!dmyStr) return '';
-                const parts = dmyStr.split('/');
-                if (parts.length !== 3) return '';
-                const [day, month, year] = parts;
-                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-            }
-
             function sortData(data, columnIndex, order) {
-                const columnMap = {
+                const columnMap = isMiscMode() ? {
+                    1: 'Task No.',
+                    2: 'Title',
+                    3: 'Description',
+                    4: 'Assigned Team',
+                    5: 'Assigned By',
+                    6: 'Status',
+                    7: 'Due Date',
+                    8: 'Created Date',
+                    9: 'Age'
+                } : {
                     1: 'Action No.',
                     2: 'ITSM Ticket',
                     3: 'Crisis/Incident',
@@ -1007,13 +1278,15 @@
                             : sB.localeCompare(sA, undefined, { numeric: true, sensitivity: 'base' });
                     }
 
-                    if ([8, 10, 11].includes(columnIndex)) { // Dates
+                    const dateCols = isMiscMode() ? [7, 8] : [8, 10, 11];
+                    if (dateCols.includes(columnIndex)) { // Dates
                         const dateA = parseDateUniversal(valA) || new Date(0);
                         const dateB = parseDateUniversal(valB) || new Date(0);
                         return order === 'asc' ? dateA - dateB : dateB - dateA;
                     }
 
-                    if ([9, 12].includes(columnIndex)) { // Times (Start/End)
+                    const timeCols = isMiscMode() ? [] : [9, 12];
+                    if (timeCols.includes(columnIndex)) { // Times (Start/End)
                         const parseTime = (t) => {
                             if (!t || t === 'N/A') return -1;
                             let h = 0, m = 0;
@@ -1032,7 +1305,8 @@
                         return order === 'asc' ? tA - tB : tB - tA;
                     }
 
-                    if ([13, 14, 15, 16].includes(columnIndex)) { // Durations/Age
+                    const ageCols = isMiscMode() ? [9] : [13, 14, 15, 16];
+                    if (ageCols.includes(columnIndex)) { // Durations/Age
                         const parseToMins = (str) => {
                             if (!str || str === 'N/A') return -1;
                             if (str.includes(':')) { // HH:MM format
@@ -1200,16 +1474,49 @@
 
             // Sync hidden picker with display
             setupDualDatePicker(weekPickerDisplay, weekPickerHidden, (isoDate) => {
-                currentPage = 1; // Reset to first page when week changes
-                loadDashboardData(isoDate);
+                currentPage = 1;
+                loadDashboardData(isoDate || getWeekPickerDateStr());
             });
 
-            // Set initial date to today
-            const today = new Date();
-            const todayISO = today.toISOString().split('T')[0];
-            weekPickerHidden.value = todayISO;
-            weekPickerDisplay.value = isoToDMY(todayISO);
-            document.getElementById('current-date').textContent = today.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+            // --- Type Selection Logic (after week picker exists) ---
+            const typeRadios = document.querySelectorAll('input[name="data-type"]');
+            typeRadios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    currentDataType = e.target.value;
+                    currentPage = 1;
+                    try {
+                        updateDynamicLabels();
+                    } catch (err) {
+                        console.error('updateDynamicLabels failed:', err);
+                    }
+                    loadDashboardData(getWeekPickerDateStr());
+                });
+            });
+
+            window.currentTimePeriod = 'Week';
+            const periodRadios = document.querySelectorAll('input[name="time-period"]');
+            const calendarControls = document.querySelector('.calendar-controls');
+
+            periodRadios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    window.currentTimePeriod = e.target.value;
+                    if (calendarControls) {
+                        if (window.currentTimePeriod === 'Year') {
+                            calendarControls.style.visibility = 'hidden';
+                            calendarControls.style.pointerEvents = 'none';
+                        } else {
+                            calendarControls.style.visibility = 'visible';
+                            calendarControls.style.pointerEvents = 'auto';
+                        }
+                    }
+                    try {
+                        updateDynamicLabels();
+                    } catch (err) {
+                        console.error('updateDynamicLabels failed:', err);
+                    }
+                    loadDashboardData(getWeekPickerDateStr());
+                });
+            });
 
             // --- Stat Card Filtering Logic ---
             const statCards = {
@@ -1247,14 +1554,14 @@
 
             // Helper to determine if an action is closed (by status OR by end date)
             function isItemClosed(item) {
-                const status = item['Action Status'] || '';
-                const endDate = item['End Date'] || '';
+                const status = item[getItemStatusField(item)] || item['Action Status'] || '';
+                const endDate = item[getItemEndDateField(item)] || item['End Date'] || '';
                 return status === 'Closed' || (endDate && endDate.trim() && endDate.toLowerCase() !== 'n/a');
             }
 
             // Helper to check if an item has started by a given week
             function isItemStartedByWeek(item, targetYear, targetWeek) {
-                const startDateStr = item['Action Start Date'];
+                const startDateStr = item[getItemStartDateField(item)];
                 if (!startDateStr || startDateStr === 'N/A') return true;
 
                 try {
@@ -1285,7 +1592,7 @@
 
             // Helper to check if an item has started by a given year (for Year mode)
             function isItemStartedByYear(item, targetYear) {
-                const startDateStr = item['Action Start Date'];
+                const startDateStr = item[getItemStartDateField(item)];
                 if (!startDateStr || startDateStr === 'N/A') return true;
 
                 try {
@@ -1341,27 +1648,49 @@
                 return `${sun.toLocaleDateString('en-GB', options)} - ${sat.toLocaleDateString('en-GB', { ...options, year: 'numeric' })}`;
             }
 
-            async function loadDashboardData(dateStr, silent = false) {
-                // Parse dateStr (YYYY-MM-DD) carefully to avoid timezone shifts
-                const [year, month, day] = dateStr.split('-').map(Number);
-                const date = new Date(year, month - 1, day);
-                
-                currentYear = date.getFullYear();
-                currentWeek = getWeekNumber(date);
-                
-                if (!silent) {
-                    if (window.currentTimePeriod === 'Year') {
-                        reportingPeriod.textContent = `Current reporting period: Full Year ${currentYear}`;
-                    } else {
-                        reportingPeriod.textContent = `Current reporting period: ${getWeekRange(date)}`;
-                    }
-                    // Only clear details if not a silent background sync
-                    detailsContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 2rem;">Select an item from the table above to view details</div>';
+            function getWeekPickerDateStr() {
+                if (weekPickerHidden && weekPickerHidden.value) {
+                    return weekPickerHidden.value;
                 }
+                return getTodayISO();
+            }
+
+            function setReportingPeriodLabel(date, errorMessage) {
+                if (!reportingPeriod) return;
+                if (errorMessage) {
+                    reportingPeriod.textContent = `Current reporting period: ${errorMessage}`;
+                    return;
+                }
+                if (window.currentTimePeriod === 'Year') {
+                    reportingPeriod.textContent = `Current reporting period: Full Year ${date.getFullYear()}`;
+                } else {
+                    reportingPeriod.textContent = `Current reporting period: ${getWeekRange(date)}`;
+                }
+            }
+
+            async function loadDashboardData(dateStr, silent = false) {
+                let effectiveDateStr = dateStr && String(dateStr).trim() ? dateStr : getTodayISO();
+                let date = null;
 
                 try {
-                    allIncidentsAndCrises = []; // Clear old references
-                    // If we are in Action mode, we also want to fetch Incidents and Crises for references
+                    const parts = effectiveDateStr.split('-').map(Number);
+                    if (parts.length >= 3 && !parts.some(isNaN)) {
+                        date = new Date(parts[0], parts[1] - 1, parts[2]);
+                    }
+                    if (!date || isNaN(date.getTime())) {
+                        effectiveDateStr = getTodayISO();
+                        const fallback = effectiveDateStr.split('-').map(Number);
+                        date = new Date(fallback[0], fallback[1] - 1, fallback[2]);
+                    }
+
+                    currentYear = date.getFullYear();
+                    currentWeek = getWeekNumber(date);
+
+                    if (!silent && detailsContainer) {
+                        detailsContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 2rem;">Select an item from the table above to view details</div>';
+                    }
+
+                    allIncidentsAndCrises = [];
                     if (currentDataType === 'Action') {
                         const [incRes, criRes] = await Promise.all([
                             fetch(`/api/data?year=${currentYear}&week=${window.currentTimePeriod === 'Year' ? 'all' : currentWeek}&type=Incident`),
@@ -1379,32 +1708,60 @@
 
                     const response = await fetch(`/api/data?year=${currentYear}&week=${window.currentTimePeriod === 'Year' ? 'all' : currentWeek}&type=${currentDataType}`);
                     if (!response.ok) {
-                        if (response.status === 503) {
-                        }
+                        setReportingPeriodLabel(date, 'Unable to load data — check that the server is running');
                         return;
                     }
-                    
+
                     const data = await response.json();
-                    
-                    // Only update if there's new data or it's a manual/initial load
-                    if (data.last_modified > lastSyncedTime || !silent) {
-                        lastSyncedTime = data.last_modified;
-                        currentItems = data.items || [];
-                        updateDashboardUI(currentItems);
-                        
-                        // If we have an active detail view, update its data if it hasn't changed locally
-                        const activeItemId = document.querySelector('.detail-title h3')?.getAttribute('data-id');
-                        if (activeItemId) {
-                            const updatedItem = currentItems.find(a => a['Action No.'] === activeItemId);
-                            const remarkItemText = document.getElementById('new-remark-action-text');
-                            if (updatedItem && (!remarkItemText || !remarkItemText.value.trim())) {
-                                showIncidentDetails(updatedItem);
+                    setReportingPeriodLabel(date, null);
+
+                    try {
+                        if (dbInitBanner) {
+                            dbInitBanner.style.display = data.db_initialized === false ? 'block' : 'none';
+                        }
+
+                        if (data.last_modified > lastSyncedTime || !silent) {
+                            lastSyncedTime = data.last_modified;
+                            currentItems = data.items || [];
+                            updateDashboardUI(currentItems);
+
+                            if (emptyWeekHint) {
+                                const showHint = data.db_initialized !== false &&
+                                    window.currentTimePeriod === 'Week' &&
+                                    (currentItems.length === 0);
+                                emptyWeekHint.style.display = showHint ? 'block' : 'none';
+                            }
+
+                            const activeItemId = document.querySelector('.detail-title h3')?.getAttribute('data-id')
+                                || document.querySelector('.detail-title-row h3')?.getAttribute('data-id');
+                            if (activeItemId) {
+                                const updatedItem = currentItems.find(a => getItemNo(a) === activeItemId);
+                                const remarkItemText = document.getElementById('new-remark-action-text');
+                                if (updatedItem && (!remarkItemText || !remarkItemText.value.trim())) {
+                                    showIncidentDetails(updatedItem);
+                                }
                             }
                         }
-                    } else {
+                    } catch (renderError) {
+                        console.error('Error rendering dashboard data:', renderError);
+                        if (emptyWeekHint) {
+                            emptyWeekHint.textContent = `Data loaded, but the table could not render: ${renderError.message}`;
+                            emptyWeekHint.style.display = 'block';
+                        }
                     }
                 } catch (error) {
                     console.error('Error fetching dashboard data:', error);
+                    const fallbackDate = date && !isNaN(date.getTime()) ? date : new Date();
+                    setReportingPeriodLabel(fallbackDate, 'Unable to load data — check that the server is running');
+                } finally {
+                    if (!reportingPeriod) return;
+                    if (reportingPeriod.textContent.includes('Loading')) {
+                        setReportingPeriodLabel(new Date(), 'Unable to load data — check that the server is running');
+                        return;
+                    }
+                    if (date && !isNaN(date.getTime())) {
+                        setReportingPeriodLabel(date, null);
+                    }
                 }
             }
 
@@ -1523,6 +1880,10 @@
                 setTimeout(() => activeInput.focus(), 100);
             }
 
+            function showNotification(title, message) {
+                return showNotificationModal({ title, message, type: 'alert' });
+            }
+
             async function showNotificationModal({ title = 'Notification', message, type = 'alert', importData = null }) {
                 return new Promise((resolve) => {
                     const modal = document.getElementById('notification-modal');
@@ -1587,7 +1948,7 @@
                 
                 const poll = async () => {
                     if (weekPickerHidden.value) {
-                        await loadDashboardData(weekPickerHidden.value, true);
+                        await loadDashboardData(getWeekPickerDateStr(), true);
                     }
                     setTimeout(poll, 3000); // Poll every 3 seconds
                 };
@@ -1601,7 +1962,7 @@
                 hiddenRows = new Set();
                 items.forEach(item => {
                     if (item.hidden) {
-                        hiddenRows.add(item['Action No.']);
+                        hiddenRows.add(getItemNo(item));
                     }
                 });
 
@@ -1610,6 +1971,7 @@
                 let plural;
                 if (currentDataType === 'Crisis') plural = 'Crises';
                 else if (currentDataType === 'Action') plural = 'Action Items';
+                else if (currentDataType === 'Miscellaneous') plural = 'Miscellaneous';
                 else plural = 'Incidents';
 
                 // 1. Filter out items based on current period mode
@@ -1623,7 +1985,7 @@
                         // For closed items in Year mode, show all closed in current year
                         if (!itemClosed) return true;
 
-                        const endDateStr = item['End Date'];
+                        const endDateStr = item[getItemEndDateField(item)];
                         if (!endDateStr || endDateStr === 'N/A') return true;
 
                         try {
@@ -1642,7 +2004,7 @@
                         // Second check: if closed, only show if closed in current week
                         if (!itemClosed) return true;
 
-                        const endDateStr = item['End Date'];
+                        const endDateStr = item[getItemEndDateField(item)];
                         if (!endDateStr || endDateStr === 'N/A') return true;
 
                         try {
@@ -1662,7 +2024,7 @@
 
                 // 2. Apply status and search filters
                 const filteredItems = displayItemsFull.filter(item => {
-                    if (filterOutHiddenRows && hiddenRows.has(item['Action No.'])) return false;
+                    if (filterOutHiddenRows && hiddenRows.has(getItemNo(item))) return false;
 
                     // Status Filter
                     if (currentStatusFilter === 'open' && isItemClosed(item)) return false;
@@ -1671,15 +2033,22 @@
                     // Search Filter
                     if (!searchVal) return true;
                     
-                    const searchableText = [
+                    const searchableText = isMiscMode() ? [
+                        item['Task No.'],
+                        item['Title'],
+                        item['Description'],
+                        item['Assigned Team'],
+                        item['Assigned By'],
+                        item['Status']
+                    ] : [
                         item['Action No.'],
                         item['Crisis/Incident'],
                         item['System'],
                         item['Owner'],
                         item['Action Status'],
                         item['Crisis Reference'] || ''
-                    ].join(' ').toLowerCase();
-                    return searchableText.includes(searchVal);
+                    ];
+                    return searchableText.join(' ').toLowerCase().includes(searchVal);
                 });
 
                 // 2.5 Apply Sorting
@@ -1690,8 +2059,8 @@
 
                 // 3. Update Stats based on relevant items for this week
                 const total = displayItemsFull.length;
-                const closedCount = displayItemsFull.filter(a => isItemClosed(a) && !(filterOutHiddenRows && hiddenRows.has(a['Action No.']))).length;
-                const openCount = displayItemsFull.filter(a => !isItemClosed(a) && !(filterOutHiddenRows && hiddenRows.has(a['Action No.']))).length;
+                const closedCount = displayItemsFull.filter(a => isItemClosed(a) && !(filterOutHiddenRows && hiddenRows.has(getItemNo(a)))).length;
+                const openCount = displayItemsFull.filter(a => !isItemClosed(a) && !(filterOutHiddenRows && hiddenRows.has(getItemNo(a)))).length;
 
                 document.querySelector('#stat-total .stat-value').textContent = openCount + closedCount;
                 document.querySelector('.stat-card.open .stat-value').textContent = openCount;
@@ -1737,8 +2106,83 @@
                 paginatedItems.forEach(item => {
                     const tr = document.createElement('tr');
                     const isClosed = isItemClosed(item);
-                    const statusText = isClosed ? 'Closed' : (item['Action Status'] || 'Open');
+                    const statusText = isClosed ? 'Closed' : (item[getItemStatusField(item)] || item['Action Status'] || 'Open');
                     const statusClass = statusText.toLowerCase().replace(/\s+/g, '-');
+                    const itemNo = getItemNo(item);
+
+                    if (isMiscMode()) {
+                        let ageDisplay = '0';
+                        const startDateRaw = item['Created Date'];
+                        const startTimeRaw = item['Created Time'];
+                        if (startDateRaw && startDateRaw !== 'N/A') {
+                            let start = parseDateUniversal(startDateRaw);
+                            if (start && !isNaN(start.getTime())) {
+                                const [hh, mm] = (startTimeRaw || '00:00').split(':').map(Number);
+                                start.setHours(hh || 0, mm || 0, 0, 0);
+                                let end = isClosed ? parseDateUniversal(item['Completed Date']) : new Date();
+                                if (isClosed && end && !isNaN(end.getTime())) {
+                                    const [eh, em] = (item['Completed Time'] || '00:00').split(':').map(Number);
+                                    end.setHours(eh || 0, em || 0, 0, 0);
+                                } else if (!isClosed) {
+                                    end = new Date();
+                                }
+                                if (start && end && !isNaN(end.getTime())) {
+                                    const diffMins = Math.floor((end - start) / (1000 * 60));
+                                    if (diffMins >= 1440) ageDisplay = `${Math.floor(diffMins / 1440)}d`;
+                                    else if (diffMins >= 0) {
+                                        ageDisplay = `${String(Math.floor(diffMins / 60)).padStart(2, '0')}:${String(diffMins % 60).padStart(2, '0')}`;
+                                    }
+                                }
+                            }
+                        }
+                        item['Age'] = ageDisplay;
+                        const rowHiddenInDb = hiddenRows.has(itemNo) || !!item.hidden;
+                        const hideRowIconAttrs = 'width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img"';
+                        const hideRowIconHtml = rowHiddenInDb
+                            ? `<svg ${hideRowIconAttrs} class="hide-row-icon" title="Unhide row"><path d="M9.88 9.88L2 2m7.88 7.88L12 12m-2.12-2.12L12 12m0 0l2.12 2.12M12 12l2.12 2.12M12 12l7.88 7.88M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"></path><line x1="2" y1="2" x2="22" y2="22"></line></svg>`
+                            : `<svg ${hideRowIconAttrs} class="hide-row-icon" title="Hide row"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+                        const completedDate = item['Completed Date'] && item['Completed Date'].trim() ? item['Completed Date'] : 'N/A';
+                        tr.innerHTML = `
+                            <td style="text-align: center;">${hideRowIconHtml}</td>
+                            <td data-id="${itemNo}">${itemNo || 'N/A'}</td>
+                            <td>${item['Title'] || 'N/A'}</td>
+                            <td>${item['Description'] || 'N/A'}</td>
+                            <td>${item['Assigned Team'] || 'N/A'}</td>
+                            <td>${item['Assigned By'] || 'N/A'}</td>
+                            <td><span class="status status-${statusClass}">${statusText}</span></td>
+                            <td>${formatDateForDisplay(item['Due Date'])}</td>
+                            <td>${formatDateForDisplay(item['Created Date'])}</td>
+                            <td class="age-column ${!isClosed ? 'urgent' : ''}">${ageDisplay}</td>
+                        `;
+                        const activeItemId = document.querySelector('.detail-title h3')?.getAttribute('data-id');
+                        if (activeItemId === itemNo) tr.style.backgroundColor = 'var(--hover-bg)';
+                        tr.addEventListener('click', (e) => {
+                            if (e.target.closest('.hide-row-icon')) {
+                                e.stopPropagation();
+                                const currentlyHidden = hiddenRows.has(itemNo) || !!item.hidden;
+                                const nextHidden = currentlyHidden ? 0 : 1;
+                                item.hidden = nextHidden;
+                                if (currentItems) {
+                                    const src = currentItems.find(a => getItemNo(a) === itemNo);
+                                    if (src) src.hidden = nextHidden;
+                                }
+                                if (nextHidden === 1) hiddenRows.add(itemNo);
+                                else hiddenRows.delete(itemNo);
+                                fetch('/api/hide-row', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ action_no: itemNo, type: currentDataType, hidden: nextHidden })
+                                }).catch(err => console.error('Error updating row hidden state:', err));
+                                updateDashboardUI(currentItems);
+                                return;
+                            }
+                            document.querySelectorAll('tbody tr').forEach(r => r.style.backgroundColor = '');
+                            tr.style.backgroundColor = 'var(--hover-bg)';
+                            showIncidentDetails(item);
+                        });
+                        tbody.appendChild(tr);
+                        return;
+                    }
                     
                     const agingVal = item['Aging'] || '0';
                     const agingNum = parseInt(agingVal.replace(/[^0-9-]/g, '')) || 0;
@@ -1822,7 +2266,7 @@
                         }
                     }
 
-                    const rowHiddenInDb = hiddenRows.has(item['Action No.']) || !!item.hidden;
+                    const rowHiddenInDb = hiddenRows.has(itemNo) || !!item.hidden;
                     const hideRowIconAttrs = 'width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img"';
                     const hideRowIconHtml = rowHiddenInDb
                         ? `<svg ${hideRowIconAttrs} class="hide-row-icon" title="Unhide row (restore in database)" aria-label="Unhide row and set hidden to 0 in the database"><path d="M9.88 9.88L2 2m7.88 7.88L12 12m-2.12-2.12L12 12m0 0l2.12 2.12M12 12l2.12 2.12M12 12l7.88 7.88M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"></path><line x1="2" y1="2" x2="22" y2="22"></line></svg>`
@@ -1832,7 +2276,7 @@
                         <td style="text-align: center;">
                             ${hideRowIconHtml}
                         </td>
-                        <td data-id="${item['Action No.'] || ''}">${item['Action No.'] || 'N/A'}</td>
+                        <td data-id="${itemNo || ''}">${itemNo || 'N/A'}</td>
                         <td>${item['ITSM Ticket'] || 'N/A'}</td>
                         <td>${titleDisplay}</td>
                         <td>${item['Description'] || 'N/A'}</td>
@@ -1852,7 +2296,7 @@
                     
                     // Re-highlight if this was the selected row
                     const activeItemId = document.querySelector('.detail-title h3')?.getAttribute('data-id');
-                    if (activeItemId === item['Action No.']) {
+                    if (activeItemId === itemNo) {
                         tr.style.backgroundColor = 'var(--hover-bg)';
                     }
                     
@@ -1860,13 +2304,12 @@
                         // Don't show details if clicking the hide icon
                         if (e.target.closest('.hide-row-icon')) {
                             e.stopPropagation();
-                            const itemNo = item['Action No.'];
                             const currentlyHidden = hiddenRows.has(itemNo) || !!item.hidden;
                             const nextHidden = currentlyHidden ? 0 : 1;
 
                             item.hidden = nextHidden;
                             if (typeof currentItems !== 'undefined' && currentItems) {
-                                const src = currentItems.find(a => a['Action No.'] === itemNo);
+                                const src = currentItems.find(a => getItemNo(a) === itemNo);
                                 if (src) src.hidden = nextHidden;
                             }
                             if (nextHidden === 1) {
@@ -1914,7 +2357,111 @@
                 });
             }
 
+            function showMiscTaskDetails(item) {
+                const taskNo = getItemNo(item);
+                const currentIndex = displayItems.findIndex(a => getItemNo(a) === taskNo);
+                const prevBtn = document.getElementById('prev-incident');
+                const nextBtn = document.getElementById('next-incident');
+                const navCount = document.getElementById('nav-count');
+
+                if (navCount) navCount.textContent = `${currentIndex + 1} of ${displayItems.length}`;
+                if (prevBtn) {
+                    prevBtn.disabled = currentIndex <= 0;
+                    prevBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        if (currentIndex > 0) showMiscTaskDetails(displayItems[currentIndex - 1]);
+                    };
+                }
+                if (nextBtn) {
+                    nextBtn.disabled = currentIndex >= displayItems.length - 1 || currentIndex === -1;
+                    nextBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        if (currentIndex < displayItems.length - 1) showMiscTaskDetails(displayItems[currentIndex + 1]);
+                    };
+                }
+
+                const isClosed = isItemClosed(item);
+                const statusValue = isClosed ? 'Closed' : (item['Status'] || 'Open');
+
+                detailsContainer.innerHTML = `
+                    <div class="detail-header">
+                        <div class="detail-title-row">
+                            <h3 data-id="${taskNo}">Task #${taskNo}: ${item['Title'] || 'N/A'}</h3>
+                        </div>
+                        <div class="detail-meta">
+                            <span><strong>Assigned Team:</strong> <span class="editable-value" data-field="Assigned Team">${item['Assigned Team'] || 'N/A'}</span><span class="edit-icon" title="Edit">✎</span></span>
+                            <span><strong>Assigned By:</strong> ${item['Assigned By'] || 'N/A'}</span>
+                            <span><strong>Status:</strong> <span class="editable-value" data-field="Status">${statusValue}</span><span class="edit-icon" title="Edit Status">✎</span></span>
+                            <span><strong>Due Date:</strong> <span class="editable-value" data-field="Due Date">${formatDateForDisplay(item['Due Date'])}</span><span class="edit-icon" title="Edit">✎</span></span>
+                            <span><strong>Created:</strong> ${formatDateForDisplay(item['Created Date'])} ${formatTimeAMPM(item['Created Time'])}</span>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label class="form-label">Description</label>
+                        <p class="editable-value" data-field="Description" style="white-space: pre-wrap;">${item['Description'] || 'N/A'}</p>
+                        <span class="edit-icon" title="Edit Description">✎</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Remarks</label>
+                        <textarea id="misc-remarks-input" class="form-control" rows="3">${item['Remarks'] || ''}</textarea>
+                        <button type="button" id="misc-save-remarks-btn" class="btn btn-primary" style="margin-top: 0.5rem;">Save Remarks</button>
+                    </div>
+                    ${!isClosed ? `<button type="button" id="misc-close-task-btn" class="btn btn-outline" style="margin-top: 1rem;">Mark as Closed</button>` : ''}
+                `;
+
+                detailsContainer.querySelectorAll('.edit-icon').forEach(icon => {
+                    icon.addEventListener('click', async () => {
+                        const fieldEl = icon.previousElementSibling;
+                        if (!fieldEl || !fieldEl.classList.contains('editable-value')) return;
+                        const field = fieldEl.getAttribute('data-field');
+                        const currentVal = field === 'Due Date' ? item['Due Date'] : (item[field] || '');
+                        showEditModal({
+                            title: `Edit ${field}`,
+                            label: field,
+                            initialValue: field === 'Due Date' ? formatDateForDisplay(currentVal) : currentVal,
+                            type: field === 'Due Date' ? 'date' : 'text',
+                            onSave: async (newVal) => {
+                                if (field === 'Due Date') item[field] = dmyToISO(newVal) || newVal;
+                                else if (field === 'Status') item[field] = newVal;
+                                else item[field] = newVal;
+                                await saveActionUpdate(item, null, true);
+                                showMiscTaskDetails(item);
+                                updateDashboardUI(currentItems);
+                            }
+                        });
+                    });
+                });
+
+                const remarksBtn = document.getElementById('misc-save-remarks-btn');
+                if (remarksBtn) {
+                    remarksBtn.onclick = async () => {
+                        item['Remarks'] = document.getElementById('misc-remarks-input').value;
+                        await saveActionUpdate(item, null, true);
+                        showNotification('Saved', 'Remarks updated.');
+                    };
+                }
+
+                const closeBtn = document.getElementById('misc-close-task-btn');
+                if (closeBtn) {
+                    closeBtn.onclick = async () => {
+                        const now = new Date();
+                        item['Status'] = 'Closed';
+                        item['Completed Date'] = now.toISOString().split('T')[0];
+                        item['Completed Time'] = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                        await saveActionUpdate(item, null, true);
+                        showMiscTaskDetails(item);
+                        updateDashboardUI(currentItems);
+                    };
+                }
+
+                detailModal.style.display = 'block';
+            }
+
             function showIncidentDetails(item) {
+                if (isMiscMode()) {
+                    showMiscTaskDetails(item);
+                    return;
+                }
                 const actionNo = item['Action No.'];
                 const incidentName = item['Crisis/Incident'] || 'N/A';
                 const systemName = item['System'] || 'N/A';
@@ -1922,7 +2469,7 @@
                 const currentStatus = item['Action Status'] || 'Unknown';
                 
                 // --- Navigation Logic ---
-                const currentIndex = displayItems.findIndex(a => a['Action No.'] === actionNo);
+                const currentIndex = displayItems.findIndex(a => getItemNo(a) === actionNo);
                 const prevBtn = document.getElementById('prev-incident');
                 const nextBtn = document.getElementById('next-incident');
                 const navCount = document.getElementById('nav-count');
@@ -2432,7 +2979,7 @@
                                                 }
                                                 
                                                 // No need to await loadDashboardData here as we've already updated the local state
-                                                loadDashboardData(weekPickerHidden.value, true);
+                                                loadDashboardData(getWeekPickerDateStr(), true);
                                             }
                                         }
                                     }
@@ -2738,7 +3285,7 @@
                             await saveActionUpdate(item, null, true);
                             
                             // 3. Silent Sync
-                            await loadDashboardData(weekPickerHidden.value, true);
+                            await loadDashboardData(getWeekPickerDateStr(), true);
                         };
                     }
                 }
@@ -2770,8 +3317,15 @@
 
                     if (!response.ok) {
                         if (response.status === 409) {
-                            showNotification('Conflict', 'This Action Number already exists for this data type.');
-                            throw new Error('Action Number conflict');
+                            showNotification('Conflict', isMiscMode()
+                                ? 'This Task Number already exists.'
+                                : 'This Action Number already exists for this data type.');
+                            throw new Error('Number conflict');
+                        }
+                        if (response.status === 400) {
+                            const err = await response.json().catch(() => ({}));
+                            showNotification('Error', err.error || 'Validation failed.');
+                            throw new Error(err.error || 'Validation failed');
                         }
                         throw new Error(`Server returned ${response.status}`);
                     }
@@ -2868,11 +3422,31 @@
                 });
             }
 
-            // Initial load
-            updateDynamicLabels();
-            loadDashboardData(weekPickerHidden.value).then(() => {
-                startLiveSync();
-            });
+            function initDashboard() {
+                const todayISO = getTodayISO();
+                if (weekPickerHidden) {
+                    weekPickerHidden.value = todayISO;
+                }
+                if (weekPickerDisplay) {
+                    weekPickerDisplay.value = isoToDMY(todayISO);
+                }
+                const currentDateEl = document.getElementById('current-date');
+                if (currentDateEl) {
+                    currentDateEl.textContent = new Date().toLocaleDateString('en-GB', {
+                        year: 'numeric', month: 'long', day: 'numeric'
+                    });
+                }
+                try {
+                    updateDynamicLabels();
+                } catch (err) {
+                    console.error('updateDynamicLabels failed on init:', err);
+                }
+                return loadDashboardData(getWeekPickerDateStr()).then(() => {
+                    startLiveSync();
+                });
+            }
+
+            initDashboard();
 
             // --- Keyboard Navigation for Modal ---
             document.addEventListener('keydown', (e) => {
@@ -2909,7 +3483,9 @@
                     // Update modal text to reflect current data type
                     const exportTypeText = document.getElementById('export-modal-data-type');
                     if (exportTypeText) {
-                        exportTypeText.textContent = currentDataType === 'Crisis' ? 'Crises' : 'Incidents';
+                        if (currentDataType === 'Crisis') exportTypeText.textContent = 'Crises';
+                        else if (currentDataType === 'Miscellaneous') exportTypeText.textContent = 'Miscellaneous';
+                        else exportTypeText.textContent = 'Incidents';
                     }
                     exportModal.style.display = 'block';
                 });
@@ -2974,7 +3550,7 @@
                                 importData: data
                             });
                             // Reload current data to reflect the imported data
-                            loadDashboardData(weekPickerHidden.value);
+                            loadDashboardData(getWeekPickerDateStr());
                         } else {
                             throw new Error(data.message || 'Import failed');
                         }
@@ -3011,7 +3587,7 @@
                                 message: `${data.message}\n\nMigrated ${data.migrated} records from ${data.files_processed} CSV files. ${data.errors} errors.`
                             });
                             // Reload current data to reflect the migrated data
-                            loadDashboardData(weekPickerHidden.value);
+                            loadDashboardData(getWeekPickerDateStr());
                         } else {
                             throw new Error(data.message || 'Unknown error');
                         }
