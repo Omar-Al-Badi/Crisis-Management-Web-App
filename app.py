@@ -87,19 +87,21 @@ BACKEND_TO_FRONTEND = {v: k for k, v in FRONTEND_TO_BACKEND.items()}
 
 # --- Miscellaneous (GM-assigned tasks) ---
 MISC_COLUMNS = [
-    "Task No.", "Title", "Description", "Assigned Team", "Assigned By",
-    "Status", "Created Date", "Created Time", "Due Date", "Remarks",
+    "Task No.", "ITSM Ticket", "Title", "Description", "Assigned Team", "Assigned By",
+    "Status", "Created Date", "Created Time", "Due Date", "Remarks", "Actions",
     "Completed Date", "Completed Time", "Hidden"
 ]
 
 MISC_CSV_TO_DB = {
     "Task No.": "task_no",
+    "ITSM Ticket": "itsm_ticket",
     "Title": "title",
     "Description": "description",
     "Assigned Team": "assigned_team",
     "Assigned By": "assigned_by",
     "Due Date": "due_date",
     "Remarks": "remarks",
+    "Actions": "actions",
     "Created Date": "created_date",
     "Created Time": "created_time",
     "Hidden": "hidden",
@@ -108,8 +110,8 @@ MISC_CSV_TO_DB = {
 MISC_DB_TO_CSV = {v: k for k, v in MISC_CSV_TO_DB.items()}
 
 MISC_CORE_FIELDS = [
-    "title", "description", "assigned_team", "assigned_by",
-    "created_date", "created_time", "due_date", "remarks", "hidden"
+    "title", "itsm_ticket", "description", "assigned_team", "assigned_by",
+    "created_date", "created_time", "due_date", "remarks", "actions", "hidden"
 ]
 
 MISC_WEEK_STATUS_FIELDS = {"status", "completed_date", "completed_time"}
@@ -369,6 +371,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             task_no TEXT NOT NULL UNIQUE,
             title TEXT,
+            itsm_ticket TEXT DEFAULT '',
             description TEXT,
             assigned_team TEXT,
             assigned_by TEXT,
@@ -376,9 +379,17 @@ def init_db():
             created_time TEXT,
             due_date TEXT,
             remarks TEXT,
+            actions TEXT DEFAULT '',
             hidden INTEGER DEFAULT 0
         )
     """)
+
+    cursor.execute("PRAGMA table_info(misc_tasks)")
+    misc_cols = [row[1] for row in cursor.fetchall()]
+    if 'actions' not in misc_cols:
+        cursor.execute("ALTER TABLE misc_tasks ADD COLUMN actions TEXT DEFAULT ''")
+    if 'itsm_ticket' not in misc_cols:
+        cursor.execute("ALTER TABLE misc_tasks ADD COLUMN itsm_ticket TEXT DEFAULT ''")
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS misc_week_status (
