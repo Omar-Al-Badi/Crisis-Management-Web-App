@@ -1963,6 +1963,85 @@
                 
                 // Tab state management for Remarks/Actions slider
                 let currentRemarksActionsTab = 'remarks'; // 'remarks' or 'actions'
+                let currentActionScope = 'internal'; // 'internal' or 'external'
+
+                function parseActionLine(raw) {
+                    const result = {
+                        date: '',
+                        scope: 'internal',
+                        assignee: '',
+                        vendorTicket: '',
+                        closed: false,
+                        text: raw.trim()
+                    };
+                    let rest = raw.trim();
+                    const dateMatch = rest.match(/^\[(\d{2}\/\d{2}\/\d{4})\]\s*/);
+                    if (!dateMatch) return result;
+
+                    result.date = dateMatch[1];
+                    rest = rest.slice(dateMatch[0].length);
+
+                    const scopeMatch = rest.match(/^\[(INTERNAL|EXTERNAL)\]\s*/i);
+                    if (scopeMatch) {
+                        result.scope = scopeMatch[1].toLowerCase();
+                        rest = rest.slice(scopeMatch[0].length);
+                    }
+
+                    while (true) {
+                        const bracketMatch = rest.match(/^\[([^\]]+)\]\s*/);
+                        if (!bracketMatch) break;
+                        const token = bracketMatch[1];
+                        const tokenUpper = token.toUpperCase();
+
+                        if (tokenUpper === 'CLOSED') {
+                            result.closed = true;
+                            rest = rest.slice(bracketMatch[0].length);
+                        } else if (/^Vendor:\s*/i.test(token)) {
+                            result.vendorTicket = token.replace(/^Vendor:\s*/i, '').trim();
+                            rest = rest.slice(bracketMatch[0].length);
+                        } else if (!result.assignee) {
+                            result.assignee = token;
+                            rest = rest.slice(bracketMatch[0].length);
+                        } else {
+                            break;
+                        }
+                    }
+
+                    result.text = rest.trim();
+                    return result;
+                }
+
+                function formatActionLine({ date, scope, assignee, vendorTicket, closed, text }) {
+                    const parts = [`[${date}]`];
+                    if (scope === 'external') {
+                        parts.push('[EXTERNAL]');
+                    }
+                    if (assignee) {
+                        parts.push(`[${assignee}]`);
+                    }
+                    if (scope === 'external' && vendorTicket) {
+                        parts.push(`[Vendor: ${vendorTicket}]`);
+                    }
+                    if (closed) {
+                        parts.push('[CLOSED]');
+                    }
+                    const body = (text || '').trim();
+                    return body ? `${parts.join(' ')} ${body}` : parts.join(' ');
+                }
+
+                function getFilteredActionEntries() {
+                    return actionsData
+                        .map((line, globalIndex) => ({
+                            line,
+                            globalIndex,
+                            parsed: parseActionLine(line)
+                        }))
+                        .filter(({ parsed }) => (parsed.scope || 'internal') === currentActionScope);
+                }
+
+                function syncActionsFieldFromData() {
+                    item['Actions'] = actionsData.join('\r\n');
+                }
                 
                 // Load remarks from the Remarks field (CRLF/LF separated list)
                 // We split by newline ONLY if it is followed by a date in [DD/MM/YYYY] format
@@ -2027,38 +2106,40 @@
                 }
 
                 function renderActions() {
-                    if (actionsData.length === 0) {
-                        return '<div class="detail-value empty-state">No actions available.</div>';
+                    const filtered = getFilteredActionEntries();
+                    if (filtered.length === 0) {
+                        const scopeLabel = currentActionScope === 'external' ? 'external' : 'internal';
+                        return `<div class="detail-value empty-state">No ${scopeLabel} actions available.</div>`;
                     }
                     return `
                         <div class="remarks-list">
-                            ${actionsData.map((actionItem, index) => {
-                                // Extract date, assignee, and closed status if they exist
-                                // Format: [DD/MM/YYYY] [Assignee] [CLOSED] Text
-                                const match = actionItem.match(/^\[(\d{2}\/\d{2}\/\d{4})\]\s*(?:\[([^\]]+)\])?\s*(\[CLOSED\])?\s*([\s\S]*)/);
-                                const dateStr = match ? match[1] : '';
-                                const assignee = match ? match[2] : '';
-                                const isItemClosed = !!match[3];
-                                const textOnly = match ? match[4] : actionItem;
-                                
+                            ${filtered.map(({ line, globalIndex, parsed }) => {
+                                const dateStr = parsed.date;
+                                const assignee = parsed.assignee;
+                                const isItemClosed = parsed.closed;
+                                const textOnly = parsed.text || line;
+                                const vendorTicket = parsed.vendorTicket;
+                                const showVendor = parsed.scope === 'external' && vendorTicket;
+
                                 return `
                                     <div class="remark-entry ${isItemClosed ? 'closed' : ''}">
                                         <div class="remark-items">
                                             <div class="action-toggle-row">
                                                 <strong>Status:</strong>
                                                 <label class="switch small" title="${isItemClosed ? 'Mark as Open' : 'Mark as Closed'}">
-                                                    <input type="checkbox" class="action-item-toggle" data-index="${index}" ${isItemClosed ? 'checked' : ''}>
+                                                    <input type="checkbox" class="action-item-toggle" data-index="${globalIndex}" ${isItemClosed ? 'checked' : ''}>
                                                     <span class="slider"></span>
                                                 </label>
                                                 <span class="toggle-label" style="color: ${isItemClosed ? 'var(--primary)' : 'var(--brand-red)'}">${isItemClosed ? 'CLOSED' : 'OPEN'}</span>
                                             </div>
                                             <div class="remark-actions">
-                                                <span class="remark-action-btn edit" data-index="${index}" data-type="action" title="Edit Action">✎</span>
-                                                <span class="remark-action-btn delete" data-index="${index}" data-type="action" title="Delete Action">🗑</span>
+                                                <span class="remark-action-btn edit" data-index="${globalIndex}" data-type="action" title="Edit Action">✎</span>
+                                                <span class="remark-action-btn delete" data-index="${globalIndex}" data-type="action" title="Delete Action">🗑</span>
                                             </div>
                                         </div>
                                         <div class="remark-meta-row">
                                             ${dateStr ? `<div class="remark-date">${dateStr}</div>` : ''}
+                                            ${showVendor ? `<div class="remark-vendor-ticket">Vendor ticket: <span class="remark-vendor-ticket-id">${vendorTicket}</span></div>` : ''}
                                             ${assignee ? `<div class="remark-assignee">Assigned to: <span class="remark-assignee-name">${assignee}</span></div>` : ''}
                                         </div>
                                         <div class="remark-text">${textOnly}</div>
@@ -2127,6 +2208,10 @@
                     
                     // Check if user is currently typing to avoid overwriting their work
                     const existingRemark = document.getElementById('new-remark-action-text')?.value || '';
+                    const existingAssignee = document.getElementById('remark-action-assignee')?.value || '';
+                    const existingVendorTicket = document.getElementById('remark-action-vendor-ticket')?.value || '';
+                    const showActionScopeTabs = currentRemarksActionsTab === 'actions';
+                    const showVendorField = showActionScopeTabs && currentActionScope === 'external';
                     
                     detailsContainer.innerHTML = `
                         <div class="detail-header">
@@ -2168,15 +2253,26 @@
                                 </div>
                             </div>
                             <div class="detail-item" style="margin-top: 0.75rem;">
-                                <div style="display: flex; align-items: baseline; position: relative; margin-bottom: 0.25rem;">
-                                    <div class="detail-label" style="margin-bottom: 0; line-height: 1.4;">${currentRemarksActionsTab === 'remarks' ? 'Current Remarks & Status Updates' : 'Current Actions & Tasks'}</div>
-                                    <div class="type-selector" style="position: absolute; left: 50%; transform: translateX(-50%); margin: 0; top: -45px;">
-                                        <div class="segmented-control">
-                                            <input type="radio" name="remarks-actions-tab" id="tab-remarks" value="remarks" ${currentRemarksActionsTab === 'remarks' ? 'checked' : ''}>
-                                            <label for="tab-remarks">Remarks</label>
-                                            <input type="radio" name="remarks-actions-tab" id="tab-items" value="actions" ${currentRemarksActionsTab === 'actions' ? 'checked' : ''}>
-                                            <label for="tab-items">Actions</label>
-                                            <div class="selection-slider remarks-actions-slider"></div>
+                                <div class="remarks-actions-header">
+                                    <div class="detail-label remarks-actions-title">${currentRemarksActionsTab === 'remarks' ? 'Current Remarks & Status Updates' : 'Current Actions & Tasks'}</div>
+                                    <div class="remarks-actions-controls">
+                                        <div class="type-selector remarks-actions-tabs">
+                                            <div class="segmented-control">
+                                                <input type="radio" name="remarks-actions-tab" id="tab-remarks" value="remarks" ${currentRemarksActionsTab === 'remarks' ? 'checked' : ''}>
+                                                <label for="tab-remarks">Remarks</label>
+                                                <input type="radio" name="remarks-actions-tab" id="tab-items" value="actions" ${currentRemarksActionsTab === 'actions' ? 'checked' : ''}>
+                                                <label for="tab-items">Actions</label>
+                                                <div class="selection-slider remarks-actions-slider"></div>
+                                            </div>
+                                        </div>
+                                        <div class="type-selector action-scope-tabs" style="display: ${showActionScopeTabs ? 'flex' : 'none'};">
+                                            <div class="segmented-control action-scope-selector">
+                                                <input type="radio" name="action-scope" id="scope-internal" value="internal" ${currentActionScope === 'internal' ? 'checked' : ''}>
+                                                <label for="scope-internal">Internal</label>
+                                                <input type="radio" name="action-scope" id="scope-external" value="external" ${currentActionScope === 'external' ? 'checked' : ''}>
+                                                <label for="scope-external">External</label>
+                                                <div class="selection-slider action-scope-slider"></div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2190,11 +2286,15 @@
                                         <textarea id="new-remark-action-text" class="form-control" placeholder="${currentRemarksActionsTab === 'remarks' ? 'Type your update here...' : 'Type your action here...'}"></textarea>
                                     </div>
                                     <div class="form-row">
-                                        <div class="form-group">
+                                        <div class="form-group action-date-column">
                                             <label class="form-label" for="remark-action-date-display">Date</label>
                                             <div style="position: relative;">
                                                 <input type="text" id="remark-action-date-display" class="form-control" value="${isoToDMY(today)}">
                                                 <input type="date" id="remark-action-date-hidden" value="${today}" style="position: absolute; top: 0; left: 0; opacity: 0; width: 100%; height: 100%; pointer-events: none;">
+                                            </div>
+                                            <div class="form-group action-vendor-group" id="action-vendor-group" style="display: ${showVendorField ? 'block' : 'none'}; margin-top: 0.5rem; margin-bottom: 0;">
+                                                <label class="form-label" for="remark-action-vendor-ticket">Vendor Ticket</label>
+                                                <input type="text" id="remark-action-vendor-ticket" class="form-control" placeholder="Optional" value="">
                                             </div>
                                         </div>
                                         <div class="form-group" id="action-assignee-group" style="display: ${currentRemarksActionsTab === 'actions' ? 'block' : 'none'}; flex: 1;">
@@ -2345,6 +2445,14 @@
                     if (existingRemark) {
                         document.getElementById('new-remark-action-text').value = existingRemark;
                     }
+                    if (existingAssignee) {
+                        const assigneeEl = document.getElementById('remark-action-assignee');
+                        if (assigneeEl) assigneeEl.value = existingAssignee;
+                    }
+                    if (existingVendorTicket) {
+                        const vendorEl = document.getElementById('remark-action-vendor-ticket');
+                        if (vendorEl) vendorEl.value = existingVendorTicket;
+                    }
 
                     // Setup dual picker for remark/action date
                     setupDualDatePicker('remark-action-date-display', 'remark-action-date-hidden');
@@ -2354,6 +2462,14 @@
                     tabRadios.forEach(radio => {
                         radio.addEventListener('change', (e) => {
                             currentRemarksActionsTab = e.target.value;
+                            updateDetailsUI();
+                        });
+                    });
+
+                    const scopeRadios = detailsContainer.querySelectorAll('input[name="action-scope"]');
+                    scopeRadios.forEach(radio => {
+                        radio.addEventListener('change', (e) => {
+                            currentActionScope = e.target.value;
                             updateDetailsUI();
                         });
                     });
@@ -2403,7 +2519,7 @@
                             // Handle Action Item Toggle
                             if (target.classList.contains('action-item-toggle')) {
                                 const index = parseInt(target.getAttribute('data-index'));
-                                let actionItem = actionsData[index];
+                                const parsed = parseActionLine(actionsData[index]);
                                 const isChecked = target.checked;
 
                                 // Update label immediately for better UX
@@ -2416,21 +2532,9 @@
                                     }
                                 }
 
-                                if (isChecked) {
-                                    // Add [CLOSED] if not present
-                                    if (!actionItem.includes('[CLOSED]')) {
-                                        // Insert [CLOSED] after the assignee or date
-                                        // Format: [DD/MM/YYYY] [Assignee] [CLOSED] Text
-                                        actionItem = actionItem.replace(/^(\[\d{2}\/\d{2}\/\d{4}\]\s*(?:\[[^\]]+\])?\s*)/, '$1[CLOSED] ');
-                                    }
-                                } else {
-                                    // Remove [CLOSED]
-                                    actionItem = actionItem.replace(/\[CLOSED\]\s*/, '');
-                                }
-
-                                actionsData[index] = actionItem;
-                                const fullActions = actionsData.join('\r\n');
-                                item['Actions'] = fullActions;
+                                parsed.closed = isChecked;
+                                actionsData[index] = formatActionLine(parsed);
+                                syncActionsFieldFromData();
 
                                 updateDetailsUI();
                                 await saveActionUpdate(item, null, true);
@@ -2460,17 +2564,18 @@
                                         }
                                     });
                                 } else if (type === 'action') {
-                                    const oldAction = actionsData[index];
+                                    const parsed = parseActionLine(actionsData[index]);
+                                    const oldText = parsed.text;
                                     showEditModal({
                                         title: 'Edit Action',
                                         label: 'Update your action:',
-                                        initialValue: oldAction,
+                                        initialValue: oldText,
                                         type: 'textarea',
                                         onSave: async (newAction) => {
-                                            if (newAction !== null && newAction.trim() !== '' && newAction !== oldAction) {
-                                                actionsData[index] = newAction.trim();
-                                                const fullActions = actionsData.join('\r\n');
-                                                item['Actions'] = fullActions;
+                                            if (newAction !== null && newAction.trim() !== '' && newAction.trim() !== oldText) {
+                                                parsed.text = newAction.trim();
+                                                actionsData[index] = formatActionLine(parsed);
+                                                syncActionsFieldFromData();
                                                 
                                                 updateDetailsUI();
                                                 await saveActionUpdate(item, null, true);
@@ -2496,8 +2601,7 @@
                                         item['Remarks'] = fullRemarks;
                                     } else if (type === 'action') {
                                         actionsData.splice(index, 1);
-                                        const fullActions = actionsData.join('\r\n');
-                                        item['Actions'] = fullActions;
+                                        syncActionsFieldFromData();
                                     }
                                     
                                     updateDetailsUI();
@@ -2532,26 +2636,31 @@
                                 return;
                             }
 
-                            // Prepend date and optionally assignee
                             const dateParts = date.split('-');
                             const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
-                            let textWithDate = `[${formattedDate}] ${text}`;
-                            if (currentRemarksActionsTab === 'actions' && assignee) {
-                                textWithDate = `[${formattedDate}] [${assignee}] ${text}`;
-                            }
 
                             if (currentRemarksActionsTab === 'remarks') {
-                                remarksData.unshift(textWithDate); // Add to top
-                                const fullRemarks = remarksData.join('\r\n');
-                                item['Remarks'] = fullRemarks;
+                                const textWithDate = `[${formattedDate}] ${text}`;
+                                remarksData.unshift(textWithDate);
+                                item['Remarks'] = remarksData.join('\r\n');
                             } else {
-                                actionsData.unshift(textWithDate); // Add to top
-                                const fullActions = actionsData.join('\r\n');
-                                item['Actions'] = fullActions;
+                                const vendorTicket = document.getElementById('remark-action-vendor-ticket')?.value.trim() || '';
+                                const textWithDate = formatActionLine({
+                                    date: formattedDate,
+                                    scope: currentActionScope,
+                                    assignee,
+                                    vendorTicket,
+                                    closed: false,
+                                    text
+                                });
+                                actionsData.unshift(textWithDate);
+                                syncActionsFieldFromData();
                             }
 
                             // 1. Optimistic UI Update
                             document.getElementById('new-remark-action-text').value = '';
+                            const vendorInput = document.getElementById('remark-action-vendor-ticket');
+                            if (vendorInput) vendorInput.value = '';
                             updateDetailsUI();
 
                             // 2. Background Save
@@ -2594,27 +2703,25 @@
 
                             if (!confirmed) return;
 
-                            // Prepend date and optionally assignee
                             const dateParts = date.split('-');
                             const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
-                            let textWithDate = `[${formattedDate}] ${text}`;
-                            if (currentRemarksActionsTab === 'actions' && assignee) {
-                                textWithDate = `[${formattedDate}] [${assignee}] ${text}`;
-                            }
-                            
-                            // If completing an action, add [CLOSED] tag
-                            if (currentRemarksActionsTab === 'actions') {
-                                textWithDate = textWithDate.replace(/^(\[\d{2}\/\d{2}\/\d{4}\]\s*(?:\[[^\]]+\])?\s*)/, '$1[CLOSED] ');
-                            }
 
                             if (currentRemarksActionsTab === 'remarks') {
-                                remarksData.unshift(textWithDate); // Add to top
-                                const fullRemarks = remarksData.join('\r\n');
-                                item['Remarks'] = fullRemarks;
+                                const textWithDate = `[${formattedDate}] ${text}`;
+                                remarksData.unshift(textWithDate);
+                                item['Remarks'] = remarksData.join('\r\n');
                             } else {
-                                actionsData.unshift(textWithDate); // Add to top
-                                const fullActions = actionsData.join('\r\n');
-                                item['Actions'] = fullActions;
+                                const vendorTicket = document.getElementById('remark-action-vendor-ticket')?.value.trim() || '';
+                                const textWithDate = formatActionLine({
+                                    date: formattedDate,
+                                    scope: currentActionScope,
+                                    assignee,
+                                    vendorTicket,
+                                    closed: true,
+                                    text
+                                });
+                                actionsData.unshift(textWithDate);
+                                syncActionsFieldFromData();
                             }
                             
                             item['Action Status'] = 'Closed';
@@ -2623,6 +2730,8 @@
 
                             // 1. Optimistic UI Update
                             document.getElementById('new-remark-action-text').value = '';
+                            const vendorInputComplete = document.getElementById('remark-action-vendor-ticket');
+                            if (vendorInputComplete) vendorInputComplete.value = '';
                             updateDetailsUI();
 
                             // 2. Background Save

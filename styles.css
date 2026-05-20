@@ -279,6 +279,10 @@ header .header-content.container {
     transform: translateX(100%);
 }
 
+#scope-external:checked ~ .action-scope-slider {
+    transform: translateX(100%);
+}
+
 .calendar-input {
     height: 45px;
     padding: 0 1rem;
@@ -1032,7 +1036,8 @@ input:checked + .slider:before {
 }
 
 .remark-entry.closed .remark-date,
-.remark-entry.closed .remark-assignee {
+.remark-entry.closed .remark-assignee,
+.remark-entry.closed .remark-vendor-ticket {
     color: var(--primary);
     opacity: 0.7;
 }
@@ -1304,7 +1309,8 @@ input:checked + .slider:before {
     font-size: 0.75rem;
 }
 
-.modal-content .remark-assignee {
+.modal-content .remark-assignee,
+.modal-content .remark-vendor-ticket {
     font-size: 0.75rem;
 }
 
@@ -1374,9 +1380,13 @@ input:checked + .slider:before {
     gap: 0.3rem;
 }
 
+.modal-content #remarks-actions-container {
+    margin-top: 0.5rem;
+}
+
 .modal-content .remarks-list {
     gap: 0.25rem;
-    margin-top: 0.15rem;
+    margin-top: 0;
 }
 
 /* Action entries: status/actions strip anchored top-right */
@@ -1653,7 +1663,8 @@ input:checked + .slider:before {
     flex: 1;
 }
 
-.remark-entry > .remark-meta-row .remark-assignee {
+.remark-entry > .remark-meta-row .remark-assignee,
+.remark-entry > .remark-meta-row .remark-vendor-ticket {
     width: 100%;
 }
 
@@ -1664,19 +1675,80 @@ input:checked + .slider:before {
     margin-bottom: 0.3rem;
 }
 
-.remark-assignee {
+.remark-assignee,
+.remark-vendor-ticket {
     font-size: 0.8rem;
     font-weight: 700;
     color: var(--warning);
     text-transform: uppercase;
 }
 
-.remark-assignee-name {
+.remark-assignee-name,
+.remark-vendor-ticket-id {
     color: #1e293b;
+    text-transform: none;
+    font-weight: 600;
 }
 
-[data-theme="dark"] .remark-assignee-name {
+[data-theme="dark"] .remark-assignee-name,
+[data-theme="dark"] .remark-vendor-ticket-id {
     color: white;
+}
+
+.remarks-actions-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 0.5rem;
+}
+
+.remarks-actions-title {
+    margin-bottom: 0 !important;
+    line-height: 1.4;
+}
+
+.remarks-actions-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+    min-height: calc(38px + 0.5rem + 38px);
+}
+
+.remarks-actions-tabs.type-selector {
+    position: static;
+    left: auto;
+    transform: none;
+    margin: 0;
+}
+
+.action-scope-tabs.type-selector {
+    position: static;
+    left: auto;
+    transform: none;
+    margin: 0;
+    align-self: flex-end;
+}
+
+.action-scope-selector.segmented-control {
+    width: 220px;
+    height: 38px;
+    min-height: 38px;
+}
+
+.modal-content .action-scope-selector.segmented-control {
+    height: 38px;
+    min-height: 38px;
+}
+
+.action-date-column {
+    flex: 1;
+    min-width: 140px;
+}
+
+.action-vendor-group {
+    margin-bottom: 0;
 }
 
 .remark-text {
