@@ -1431,6 +1431,24 @@
                 } catch (e) { return null; }
             }
 
+        function miscAgeInCalendarDays(createdDateRaw, completedDateRaw, isClosed) {
+            const start = parseDateUniversal(createdDateRaw);
+            if (!start || isNaN(start.getTime())) return '0d';
+
+            let end;
+            if (isClosed && completedDateRaw && completedDateRaw !== 'N/A') {
+                end = parseDateUniversal(completedDateRaw);
+            } else {
+                end = new Date();
+            }
+            if (!end || isNaN(end.getTime())) return '0d';
+
+            const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+            const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+            const days = Math.max(0, Math.round((endDay - startDay) / (1000 * 60 * 60 * 24)));
+            return `${days}d`;
+        }
+
         function formatDateForDisplay(dateStr) {
                 if (!dateStr || dateStr === 'N/A') return 'N/A';
                 const date = parseDateUniversal(dateStr);
@@ -2669,30 +2687,11 @@
                     const itemNo = getItemNo(item);
 
                     if (isMiscMode()) {
-                        let ageDisplay = '0';
-                        const startDateRaw = item['Created Date'];
-                        const startTimeRaw = item['Created Time'];
-                        if (startDateRaw && startDateRaw !== 'N/A') {
-                            let start = parseDateUniversal(startDateRaw);
-                            if (start && !isNaN(start.getTime())) {
-                                const [hh, mm] = (startTimeRaw || '00:00').split(':').map(Number);
-                                start.setHours(hh || 0, mm || 0, 0, 0);
-                                let end = isClosed ? parseDateUniversal(item['Completed Date']) : new Date();
-                                if (isClosed && end && !isNaN(end.getTime())) {
-                                    const [eh, em] = (item['Completed Time'] || '00:00').split(':').map(Number);
-                                    end.setHours(eh || 0, em || 0, 0, 0);
-                                } else if (!isClosed) {
-                                    end = new Date();
-                                }
-                                if (start && end && !isNaN(end.getTime())) {
-                                    const diffMins = Math.floor((end - start) / (1000 * 60));
-                                    if (diffMins >= 1440) ageDisplay = `${Math.floor(diffMins / 1440)}d`;
-                                    else if (diffMins >= 0) {
-                                        ageDisplay = `${String(Math.floor(diffMins / 60)).padStart(2, '0')}:${String(diffMins % 60).padStart(2, '0')}`;
-                                    }
-                                }
-                            }
-                        }
+                        const ageDisplay = miscAgeInCalendarDays(
+                            item['Created Date'],
+                            item['Completed Date'],
+                            isClosed
+                        );
                         item['Age'] = ageDisplay;
                         const rowHiddenInDb = hiddenRows.has(itemNo) || !!item.hidden;
                         const hideRowIconAttrs = 'width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img"';
