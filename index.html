@@ -1002,7 +1002,7 @@
                     plural = 'Action Items';
                 } else if (currentDataType === 'Miscellaneous') {
                     singular = 'Task';
-                    plural = 'Miscellaneous';
+                    plural = 'Tasks';
                 } else {
                     singular = 'Incident';
                     plural = 'Incidents';
@@ -1773,12 +1773,11 @@
                 } = config;
                 const effectiveTab = actionsOnly ? 'actions' : currentTab;
                 const showActionScopeTabs = showScopeTabs && effectiveTab === 'actions';
-
-                return `
-                    <div class="remarks-actions-header">
-                        <div class="detail-label remarks-actions-title">${effectiveTab === 'remarks' ? 'Current Remarks & Status Updates' : 'Current Actions & Tasks'}</div>
+                const headerClass = actionsOnly
+                    ? 'remarks-actions-header remarks-actions-header--actions-only'
+                    : 'remarks-actions-header';
+                const controlsHtml = actionsOnly ? '' : `
                         <div class="remarks-actions-controls">
-                            ${actionsOnly ? '' : `
                             <div class="type-selector remarks-actions-tabs">
                                 <div class="segmented-control">
                                     <input type="radio" name="remarks-actions-tab" id="tab-remarks" value="remarks" ${currentTab === 'remarks' ? 'checked' : ''}>
@@ -1787,7 +1786,7 @@
                                     <label for="tab-items">Actions</label>
                                     <div class="selection-slider remarks-actions-slider"></div>
                                 </div>
-                            </div>`}
+                            </div>
                             ${showScopeTabs ? `
                             <div class="type-selector action-scope-tabs" style="display: ${showActionScopeTabs ? 'flex' : 'none'};">
                                 <div class="segmented-control action-scope-selector">
@@ -1798,7 +1797,12 @@
                                     <div class="selection-slider action-scope-slider"></div>
                                 </div>
                             </div>` : ''}
-                        </div>
+                        </div>`;
+
+                return `
+                    <div class="${headerClass}">
+                        <div class="detail-label remarks-actions-title">${effectiveTab === 'remarks' ? 'Current Remarks & Status Updates' : 'Current Actions & Tasks'}</div>
+                        ${controlsHtml}
                     </div>
                     <div id="remarks-actions-container">
                         ${effectiveTab === 'remarks' ? renderRemarksList(remarksData) : renderActionsList(actionsData, currentScope, showScopeTabs)}
@@ -2547,7 +2551,7 @@
                 let plural;
                 if (currentDataType === 'Crisis') plural = 'Crises';
                 else if (currentDataType === 'Action') plural = 'Action Items';
-                else if (currentDataType === 'Miscellaneous') plural = 'Miscellaneous';
+                else if (currentDataType === 'Miscellaneous') plural = 'Tasks';
                 else plural = 'Incidents';
 
                 // 1. Filter out items based on current period mode
@@ -2915,6 +2919,9 @@
             }
 
             function showMiscTaskDetails(item) {
+                const modalContent = detailModal.querySelector('.modal-content');
+                if (modalContent) modalContent.classList.add('misc-task-detail');
+
                 const taskNo = getItemNo(item);
                 const currentIndex = displayItems.findIndex(a => getItemNo(a) === taskNo);
                 const prevBtn = document.getElementById('prev-incident');
@@ -2946,7 +2953,7 @@
                     const isClosed = isItemClosed(item);
                     const currentStatusValue = isClosed ? 'Closed' : (item['Status'] || 'Open');
                     const showVendorField = false;
-                    const itsmDisplay = (item['ITSM Ticket'] || '').trim() || '(Optional)';
+                    const itsmDisplay = (item['ITSM Ticket'] || '').trim() || 'N/A';
                     const drafts = {
                         assignee: document.getElementById('remark-action-assignee')?.value || ''
                     };
@@ -2983,7 +2990,7 @@
                                     <span class="edit-icon" title="Edit Description">✎</span>
                                 </div>
                             </div>
-                            <div class="detail-item" style="margin-top: 0.75rem;">
+                            <div class="detail-item detail-item--actions-panel">
                                 ${renderRemarksActionsPanelHtml({
                                     currentTab: raState.currentTab,
                                     currentScope: raState.currentScope,
@@ -3099,7 +3106,7 @@
                         closureDateSpanId: 'detail-closure-date'
                     });
 
-                    const panelRoot = detailsContainer.querySelector('.detail-item[style*="margin-top"]');
+                    const panelRoot = detailsContainer.querySelector('.detail-item--actions-panel');
                     attachRemarksActionsHandlers(panelRoot, {
                         item,
                         state: raState,
@@ -3130,6 +3137,10 @@
                     showMiscTaskDetails(item);
                     return;
                 }
+
+                const modalContent = detailModal.querySelector('.modal-content');
+                if (modalContent) modalContent.classList.remove('misc-task-detail');
+
                 const actionNo = item['Action No.'];
                 const incidentName = item['Crisis/Incident'] || 'N/A';
                 const systemName = item['System'] || 'N/A';
@@ -3242,7 +3253,7 @@
                                     <span class="edit-icon" title="Edit Description">✎</span>
                                 </div>
                             </div>
-                            <div class="detail-item" style="margin-top: 0.75rem;">
+                            <div class="detail-item detail-item--actions-panel">
                                 ${renderRemarksActionsPanelHtml({
                                     currentTab: raState.currentTab,
                                     currentScope: raState.currentScope,
@@ -3371,7 +3382,7 @@
                         endTimeSpanId: 'detail-end-time'
                     });
 
-                    const panelRoot = detailsContainer.querySelector('.detail-item[style*="margin-top"]');
+                    const panelRoot = detailsContainer.querySelector('.detail-item--actions-panel');
                     attachRemarksActionsHandlers(panelRoot, {
                         item,
                         state: raState,
@@ -3585,7 +3596,7 @@
                     const exportTypeText = document.getElementById('export-modal-data-type');
                     if (exportTypeText) {
                         if (currentDataType === 'Crisis') exportTypeText.textContent = 'Crises';
-                        else if (currentDataType === 'Miscellaneous') exportTypeText.textContent = 'Miscellaneous';
+                        else if (currentDataType === 'Miscellaneous') exportTypeText.textContent = 'Tasks';
                         else exportTypeText.textContent = 'Incidents';
                     }
                     exportModal.style.display = 'block';

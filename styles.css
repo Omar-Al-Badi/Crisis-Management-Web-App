@@ -1424,7 +1424,21 @@ input:checked + .slider:before {
 .modal-content .description-box {
     padding: 0.4rem 0.5rem 0.4rem 1rem;
     margin-top: 0.15rem;
-    margin-bottom: 2.5rem;
+    margin-bottom: 0.35rem;
+}
+
+.modal-content .detail-item--actions-panel {
+    margin-top: 0.35rem;
+}
+
+/* Miscellaneous task detail modal — tighter spacing between actions title and list */
+.modal-content.misc-task-detail .remarks-actions-header--actions-only {
+    margin-bottom: 0.25rem;
+    gap: 0;
+}
+
+.modal-content.misc-task-detail #remarks-actions-container {
+    margin-top: 0.15rem;
 }
 
 .modal-content .detail-label {
