@@ -1754,15 +1754,18 @@ input:checked + .slider:before {
 }
 
 .remarks-actions-controls {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    gap: 0.5rem;
+    width: 100%;
+    gap: 0.75rem;
     position: relative;
-    min-height: calc(38px + 0.5rem + 38px);
+    min-height: 38px;
 }
 
 .remarks-actions-tabs.type-selector {
+    grid-column: 2;
+    justify-self: center;
     position: static;
     left: auto;
     transform: none;
@@ -1770,17 +1773,29 @@ input:checked + .slider:before {
 }
 
 .action-scope-tabs.type-selector {
+    grid-column: 3;
+    justify-self: end;
     position: static;
     left: auto;
     transform: none;
     margin: 0;
-    align-self: flex-end;
 }
 
 .action-scope-selector.segmented-control {
-    width: 220px;
+    width: 100px;
     height: 38px;
     min-height: 38px;
+}
+
+.action-scope-selector label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.action-scope-selector .action-scope-icon {
+    display: block;
 }
 
 .modal-content .action-scope-selector.segmented-control {

@@ -1791,9 +1791,22 @@
                             <div class="type-selector action-scope-tabs" style="display: ${showActionScopeTabs ? 'flex' : 'none'};">
                                 <div class="segmented-control action-scope-selector">
                                     <input type="radio" name="action-scope" id="scope-internal" value="internal" ${currentScope === 'internal' ? 'checked' : ''}>
-                                    <label for="scope-internal">Internal</label>
+                                    <label for="scope-internal" title="Internal" aria-label="Internal">
+                                        <svg class="action-scope-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"></path>
+                                            <path d="M6 12H4a1 1 0 0 0-1 1v7h3"></path>
+                                            <path d="M18 9h2a1 1 0 0 1 1 1v9h-3"></path>
+                                            <path d="M10 6h4"></path><path d="M10 10h4"></path><path d="M10 14h4"></path><path d="M10 18h4"></path>
+                                        </svg>
+                                    </label>
                                     <input type="radio" name="action-scope" id="scope-external" value="external" ${currentScope === 'external' ? 'checked' : ''}>
-                                    <label for="scope-external">External</label>
+                                    <label for="scope-external" title="External" aria-label="External">
+                                        <svg class="action-scope-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path>
+                                            <path d="M2 12h20"></path>
+                                        </svg>
+                                    </label>
                                     <div class="selection-slider action-scope-slider"></div>
                                 </div>
                             </div>` : ''}
