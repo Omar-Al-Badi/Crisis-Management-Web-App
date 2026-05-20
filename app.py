@@ -295,6 +295,49 @@ def migrate_to_normalized_schema():
         }
 
 
+def run_schema_migrations(conn):
+    """Apply incremental schema migrations to an existing database connection."""
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='items'")
+    if cursor.fetchone():
+        try:
+            cursor.execute("SELECT hidden FROM items LIMIT 1")
+        except sqlite3.OperationalError:
+            print("Migrating database: Adding hidden column...")
+            cursor.execute("ALTER TABLE items ADD COLUMN hidden INTEGER DEFAULT 0")
+
+        try:
+            cursor.execute("SELECT time_to_acknowledge FROM items LIMIT 1")
+        except sqlite3.OperationalError:
+            print("Migrating database: Adding TTA, TTR, TTD columns...")
+            cursor.execute("ALTER TABLE items ADD COLUMN time_to_acknowledge TEXT")
+            cursor.execute("ALTER TABLE items ADD COLUMN time_to_recover TEXT")
+            cursor.execute("ALTER TABLE items ADD COLUMN time_to_detect TEXT")
+
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='misc_tasks'")
+    if cursor.fetchone():
+        cursor.execute("PRAGMA table_info(misc_tasks)")
+        misc_cols = [row[1] for row in cursor.fetchall()]
+        if 'actions' not in misc_cols:
+            print("Migrating database: Adding actions column to misc_tasks...")
+            cursor.execute("ALTER TABLE misc_tasks ADD COLUMN actions TEXT DEFAULT ''")
+        if 'itsm_ticket' not in misc_cols:
+            print("Migrating database: Adding itsm_ticket column to misc_tasks...")
+            cursor.execute("ALTER TABLE misc_tasks ADD COLUMN itsm_ticket TEXT DEFAULT ''")
+
+
+def ensure_schema_migrations():
+    """Run schema migrations on an existing database file."""
+    if not os.path.exists(DB_PATH):
+        return
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
+    run_schema_migrations(conn)
+    conn.commit()
+    conn.close()
+
+
 def init_db():
     """Initialize the SQLite database with normalized schema."""
     if not os.path.exists(DATA_DIR):
@@ -332,22 +375,6 @@ def init_db():
     item_cols.append("UNIQUE(data_type, action_no)")
     
     cursor.execute(f"CREATE TABLE IF NOT EXISTS items ({', '.join(item_cols)})")
-
-    # Migration: Check if hidden column exists, if not add it
-    try:
-        cursor.execute("SELECT hidden FROM items LIMIT 1")
-    except sqlite3.OperationalError:
-        print("Migrating database: Adding hidden column...")
-        cursor.execute("ALTER TABLE items ADD COLUMN hidden INTEGER DEFAULT 0")
-
-    # Migration: Check if TTA, TTR, TTD columns exist, if not add them
-    try:
-        cursor.execute("SELECT time_to_acknowledge FROM items LIMIT 1")
-    except sqlite3.OperationalError:
-        print("Migrating database: Adding TTA, TTR, TTD columns...")
-        cursor.execute("ALTER TABLE items ADD COLUMN time_to_acknowledge TEXT")
-        cursor.execute("ALTER TABLE items ADD COLUMN time_to_recover TEXT")
-        cursor.execute("ALTER TABLE items ADD COLUMN time_to_detect TEXT")
     
     # Create week_status table
     cursor.execute("""
@@ -384,12 +411,7 @@ def init_db():
         )
     """)
 
-    cursor.execute("PRAGMA table_info(misc_tasks)")
-    misc_cols = [row[1] for row in cursor.fetchall()]
-    if 'actions' not in misc_cols:
-        cursor.execute("ALTER TABLE misc_tasks ADD COLUMN actions TEXT DEFAULT ''")
-    if 'itsm_ticket' not in misc_cols:
-        cursor.execute("ALTER TABLE misc_tasks ADD COLUMN itsm_ticket TEXT DEFAULT ''")
+    run_schema_migrations(conn)
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS misc_week_status (
@@ -1296,6 +1318,8 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
 
     def handle_get_misc_data(self, year, week, is_year_mode):
         conn = get_db_connection()
+        run_schema_migrations(conn)
+        conn.commit()
         cursor = conn.cursor()
         last_modified = os.path.getmtime(DB_PATH) if os.path.exists(DB_PATH) else 0
 
@@ -1409,6 +1433,8 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         conn = get_db_connection()
+        run_schema_migrations(conn)
+        conn.commit()
         cursor = conn.cursor()
 
         cursor.execute(
@@ -2229,6 +2255,7 @@ if __name__ == "__main__":
         os.makedirs(DATA_DIR)
     
     migrate_existing_files()
+    ensure_schema_migrations()
     
     with ThreadingTCPServer(("", PORT), CrisisHandler) as httpd:
         print(f"Serving Crisis Hub at http://localhost:{PORT}")
