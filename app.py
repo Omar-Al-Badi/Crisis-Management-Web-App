@@ -517,6 +517,209 @@ def item_dict_to_db_values(item, data_type):
     return tuple(values)
 
 
+ITEM_WEEK_STATUS_CSV = {"Action Status", "End Date", "End Time"}
+MISC_WEEK_STATUS_CSV = {"Status", "Completed Date", "Completed Time"}
+
+
+def detect_import_delimiter(text):
+    """Detect comma vs tab (Excel paste) delimiter."""
+    sample = text[:8192]
+    try:
+        dialect = csv.Sniffer().sniff(sample, delimiters=',\t;')
+        return dialect.delimiter
+    except csv.Error:
+        tab_count = sample.count('\t')
+        comma_count = sample.count(',')
+        return '\t' if tab_count > comma_count else ','
+
+
+def match_header_to_canonical(raw_header, expected_headers, used):
+    """Map a pasted header cell to a canonical column name."""
+    raw = raw_header.strip()
+    if not raw:
+        return None
+
+    raw_lower = raw.lower()
+
+    for exp in expected_headers:
+        if exp not in used and exp.lower() == raw_lower:
+            return exp
+
+    prefix_matches = []
+    for exp in expected_headers:
+        if exp in used:
+            continue
+        exp_lower = exp.lower()
+        if exp_lower.startswith(raw_lower) or (
+            len(raw_lower) >= 3 and raw_lower.startswith(exp_lower[:len(raw_lower)])
+        ):
+            prefix_matches.append(exp)
+
+    if len(prefix_matches) == 1:
+        return prefix_matches[0]
+
+    starts_with = [c for c in prefix_matches if c.lower().startswith(raw_lower)]
+    if len(starts_with) == 1:
+        return starts_with[0]
+    if starts_with:
+        return max(starts_with, key=len)
+
+    for exp in expected_headers:
+        if exp not in used and exp.lower().startswith(raw_lower):
+            return exp
+
+    return None
+
+
+def count_header_matches(row, expected_headers):
+    used = set()
+    matches = 0
+    for cell in row:
+        canonical = match_header_to_canonical(cell, expected_headers, used)
+        if canonical:
+            used.add(canonical)
+            matches += 1
+    return matches
+
+
+def row_looks_like_header(row, expected_headers):
+    if not row:
+        return False
+    id_header = expected_headers[0]
+    if row[0].strip() == id_header:
+        return True
+    matches = count_header_matches(row, expected_headers)
+    return matches >= max(2, len(row) // 2)
+
+
+def row_looks_like_data(row, expected_headers, id_header):
+    if not row or not any(cell.strip() for cell in row):
+        return False
+    if row[0].strip() == id_header:
+        return False
+    if count_header_matches(row, expected_headers) >= max(2, len(row) // 2):
+        return False
+    return True
+
+
+def map_header_row(raw_headers, expected_headers):
+    mapped = []
+    present_columns = []
+    used = set()
+    for raw in raw_headers:
+        canonical = match_header_to_canonical(raw, expected_headers, used)
+        if canonical:
+            used.add(canonical)
+            mapped.append(canonical)
+            present_columns.append(canonical)
+        else:
+            stripped = raw.strip()
+            mapped.append(stripped)
+            if stripped:
+                present_columns.append(stripped)
+    return mapped, present_columns
+
+
+def parse_import_text(text, data_type):
+    """Parse CSV/TSV import text into row dicts with column validation."""
+    expected_headers = MISC_COLUMNS if data_type == "Miscellaneous" else COLUMNS
+    id_header = expected_headers[0]
+
+    validation = {
+        "valid": False,
+        "message": "",
+        "header_columns": 0,
+        "rows_parsed": 0,
+        "rows_valid": 0,
+        "rows_invalid": [],
+        "present_columns": [],
+    }
+
+    text = text.strip()
+    if not text:
+        validation["message"] = "Import data is empty"
+        return [], set(), validation
+
+    delimiter = detect_import_delimiter(text)
+    all_rows = list(csv.reader(io.StringIO(text), delimiter=delimiter))
+
+    if not all_rows:
+        validation["message"] = "Import data is empty"
+        return [], set(), validation
+
+    has_header = row_looks_like_header(all_rows[0], expected_headers)
+
+    if has_header:
+        mapped_headers, present_columns = map_header_row(all_rows[0], expected_headers)
+        data_rows_raw = all_rows[1:]
+        header_row_num = 1
+    elif row_looks_like_data(all_rows[0], expected_headers, id_header):
+        mapped_headers = list(expected_headers)
+        present_columns = list(expected_headers)
+        data_rows_raw = all_rows
+        header_row_num = 0
+    else:
+        validation["message"] = (
+            f"Could not detect header row. Include column headers or start with {id_header}."
+        )
+        return [], set(), validation
+
+    header_columns = len(mapped_headers)
+    validation["header_columns"] = header_columns
+    validation["present_columns"] = present_columns
+
+    if header_columns < 1:
+        validation["message"] = "No columns found in import data"
+        return [], set(present_columns), validation
+
+    if header_columns < 2:
+        validation["message"] = "Import must include at least 2 columns (identifier + at least one field)"
+        return [], set(present_columns), validation
+
+    if id_header not in present_columns:
+        validation["message"] = f"Import must include the {id_header} column to match or create records"
+        return [], set(present_columns), validation
+
+    rows = []
+    rows_invalid = []
+
+    for idx, raw_row in enumerate(data_rows_raw):
+        row_num = (header_row_num + 1 + idx) if has_header else (idx + 1)
+        if not any(cell.strip() for cell in raw_row):
+            continue
+
+        col_count = len(raw_row)
+        if col_count != header_columns:
+            rows_invalid.append({"row": row_num, "columns": col_count, "expected": header_columns})
+            continue
+
+        row_dict = {}
+        for i, canonical in enumerate(mapped_headers):
+            row_dict[canonical] = raw_row[i] if i < len(raw_row) else ""
+        rows.append(row_dict)
+
+    validation["rows_parsed"] = len(data_rows_raw)
+    validation["rows_valid"] = len(rows)
+    validation["rows_invalid"] = [entry["row"] for entry in rows_invalid]
+
+    if rows_invalid:
+        first = rows_invalid[0]
+        validation["message"] = (
+            f"Column count mismatch: header has {header_columns} columns, "
+            f"row {first['row']} has {first['columns']} columns"
+        )
+        if len(rows_invalid) > 1:
+            validation["message"] += f" ({len(rows_invalid)} rows with mismatched columns)"
+        return [], set(present_columns), validation
+
+    if not rows:
+        validation["message"] = "No valid data rows found in import"
+        return [], set(present_columns), validation
+
+    validation["valid"] = True
+    return rows, set(present_columns), validation
+
+
 def get_item_id(cursor, data_type, action_no):
     """Get the action_id for a given data_type and action_no."""
     cursor.execute(
@@ -824,6 +1027,7 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
             parts = body.split(b'--' + boundary)
             
             file_content = None
+            csv_text_raw = None
             year = None
             week = None
             data_type = "Incident"
@@ -837,6 +1041,10 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                     header_end = part.find(b'\r\n\r\n')
                     if header_end != -1:
                         file_content = part[header_end+4:].rstrip(b'\r\n')
+                elif b'name="csv_text"' in part:
+                    header_end = part.find(b'\r\n\r\n')
+                    if header_end != -1:
+                        csv_text_raw = part[header_end+4:].rstrip(b'\r\n').decode('utf-8')
                 elif b'name="year"' in part:
                     header_end = part.find(b'\r\n\r\n')
                     if header_end != -1:
@@ -854,11 +1062,14 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                     if header_end != -1:
                         data_type = part[header_end+4:].rstrip(b'\r\n').decode().strip()
 
-            if file_content is None or year is None or week is None:
+            if (file_content is None and csv_text_raw is None) or year is None or week is None:
                 missing = []
-                if file_content is None: missing.append("file")
-                if year is None: missing.append("year")
-                if week is None: missing.append("week")
+                if file_content is None and csv_text_raw is None:
+                    missing.append("file or csv_text")
+                if year is None:
+                    missing.append("year")
+                if week is None:
+                    missing.append("week")
                 
                 self.send_response(400)
                 self.send_header("Content-Type", "application/json")
@@ -867,13 +1078,39 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             # Parse CSV
-            try:
-                csv_text = file_content.decode('utf-8-sig')
-            except UnicodeDecodeError:
-                csv_text = file_content.decode('latin-1')
-                
-            f = io.StringIO(csv_text)
-            reader = csv.DictReader(f)
+            if file_content is not None:
+                try:
+                    csv_text = file_content.decode('utf-8-sig')
+                except UnicodeDecodeError:
+                    csv_text = file_content.decode('latin-1')
+            else:
+                csv_text = csv_text_raw
+
+            rows, present_columns, validation = parse_import_text(csv_text, data_type)
+            if not validation["valid"]:
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "status": "error",
+                    "message": validation["message"],
+                    "validation": {
+                        "header_columns": validation["header_columns"],
+                        "rows_parsed": validation["rows_parsed"],
+                        "rows_valid": validation["rows_valid"],
+                        "rows_invalid": validation["rows_invalid"],
+                        "present_columns": validation["present_columns"],
+                    }
+                }).encode())
+                return
+
+            validation_summary = {
+                "header_columns": validation["header_columns"],
+                "rows_parsed": validation["rows_parsed"],
+                "rows_valid": validation["rows_valid"],
+                "rows_invalid": validation["rows_invalid"],
+                "present_columns": validation["present_columns"],
+            }
             
             new_count = 0
             updated_count = 0
@@ -887,10 +1124,10 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
             if data_type == "Miscellaneous":
                 conn = get_db_connection()
                 cursor = conn.cursor()
-                for row in reader:
+                for row in rows:
                     try:
                         task_no = row.get("Task No.")
-                        if not task_no:
+                        if not task_no or str(task_no).strip() == "Task No.":
                             continue
                         task_id = get_misc_task_id(cursor, task_no)
                         if not task_id:
@@ -917,13 +1154,16 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                             if existing_item:
                                 for i, col in enumerate(MISC_CORE_FIELDS):
                                     csv_col = MISC_DB_TO_CSV.get(col)
+                                    if csv_col and csv_col not in present_columns:
+                                        continue
                                     if csv_col:
                                         csv_val = str(row.get(csv_col, "")).strip()
                                         db_val = str(existing_item[i] if existing_item[i] is not None else "").strip()
                                         if csv_val != db_val:
                                             changed = True
                                             break
-                            if not changed:
+                            week_fields_present = MISC_WEEK_STATUS_CSV & present_columns
+                            if not changed and week_fields_present:
                                 cursor.execute("""
                                     SELECT status, completed_date, completed_time
                                     FROM misc_week_status WHERE task_id = ? AND year = ? AND week = ?
@@ -932,15 +1172,19 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                                 if not existing_status:
                                     changed = True
                                 else:
-                                    if (str(row.get("Status", "")).strip() != str(existing_status["status"] or "").strip() or
-                                            str(row.get("Completed Date", "")).strip() != str(existing_status["completed_date"] or "").strip() or
-                                            str(row.get("Completed Time", "")).strip() != str(existing_status["completed_time"] or "").strip()):
+                                    if "Status" in present_columns and str(row.get("Status", "")).strip() != str(existing_status["status"] or "").strip():
+                                        changed = True
+                                    elif "Completed Date" in present_columns and str(row.get("Completed Date", "")).strip() != str(existing_status["completed_date"] or "").strip():
+                                        changed = True
+                                    elif "Completed Time" in present_columns and str(row.get("Completed Time", "")).strip() != str(existing_status["completed_time"] or "").strip():
                                         changed = True
                             if changed:
                                 update_parts = []
                                 values = []
                                 for col in MISC_CORE_FIELDS:
                                     csv_col = MISC_DB_TO_CSV.get(col)
+                                    if csv_col and csv_col not in present_columns:
+                                        continue
                                     if csv_col:
                                         update_parts.append(f"{col} = ?")
                                         val = row.get(csv_col, "")
@@ -949,18 +1193,31 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                                         elif col in MISC_TIME_FIELDS:
                                             val = normalize_time_to_24h(val)
                                         values.append(val)
-                                values.append(task_id)
-                                cursor.execute(
-                                    f"UPDATE misc_tasks SET {', '.join(update_parts)} WHERE id = ?",
-                                    values
-                                )
-                                cursor.execute("""
-                                    INSERT OR REPLACE INTO misc_week_status (task_id, year, week, status, completed_date, completed_time)
-                                    VALUES (?, ?, ?, ?, ?, ?)
-                                """, (task_id, year, week,
-                                      row.get("Status", ""),
-                                      normalize_date(row.get("Completed Date", "")),
-                                      normalize_time_to_24h(row.get("Completed Time", ""))))
+                                if update_parts:
+                                    values.append(task_id)
+                                    cursor.execute(
+                                        f"UPDATE misc_tasks SET {', '.join(update_parts)} WHERE id = ?",
+                                        values
+                                    )
+                                if week_fields_present:
+                                    cursor.execute("""
+                                        SELECT status, completed_date, completed_time
+                                        FROM misc_week_status WHERE task_id = ? AND year = ? AND week = ?
+                                    """, (task_id, year, week))
+                                    existing_status = cursor.fetchone()
+                                    status = row.get("Status", "") if "Status" in present_columns else (
+                                        existing_status["status"] if existing_status else ""
+                                    )
+                                    completed_date = normalize_date(row.get("Completed Date", "")) if "Completed Date" in present_columns else (
+                                        existing_status["completed_date"] if existing_status else ""
+                                    )
+                                    completed_time = normalize_time_to_24h(row.get("Completed Time", "")) if "Completed Time" in present_columns else (
+                                        existing_status["completed_time"] if existing_status else ""
+                                    )
+                                    cursor.execute("""
+                                        INSERT OR REPLACE INTO misc_week_status (task_id, year, week, status, completed_date, completed_time)
+                                        VALUES (?, ?, ?, ?, ?, ?)
+                                    """, (task_id, year, week, status, completed_date, completed_time))
                                 updated_count += 1
                             else:
                                 skipped_count += 1
@@ -977,17 +1234,18 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                     "new": new_count,
                     "updated": updated_count,
                     "skipped": skipped_count,
-                    "errors": error_count
+                    "errors": error_count,
+                    "validation": validation_summary
                 }).encode())
                 return
                 
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            for row in reader:
+            for row in rows:
                 try:
                     action_no = row.get("Action No.")
-                    if not action_no:
+                    if not action_no or str(action_no).strip() == "Action No.":
                         continue
                         
                     # Check if item exists
@@ -1022,6 +1280,7 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                     else:
                         # Check if anything changed
                         changed = False
+                        week_fields_present = ITEM_WEEK_STATUS_CSV & present_columns
                         
                         # 1. Check core fields
                         cursor.execute(f"SELECT {', '.join(CORE_ITEM_FIELDS)} FROM items WHERE id = ?", (item_id,))
@@ -1032,6 +1291,8 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                                 csv_col = DB_TO_CSV.get(col)
                                 if csv_col:
                                     frontend_key = BACKEND_TO_FRONTEND.get(col, csv_col)
+                                    if frontend_key not in present_columns:
+                                        continue
                                     csv_val = str(row.get(frontend_key, "")).strip()
                                     db_val = str(existing_item[i] if existing_item[i] is not None else "").strip()
                                     if csv_val != db_val:
@@ -1039,7 +1300,7 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                                         break
                         
                         # 2. Check week status
-                        if not changed:
+                        if not changed and week_fields_present:
                             cursor.execute("""
                                 SELECT action_status, end_date, end_time 
                                 FROM week_status 
@@ -1050,45 +1311,65 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                             if not existing_status:
                                 changed = True
                             else:
-                                csv_status = str(row.get("Action Status", "")).strip()
-                                db_status = str(existing_status["action_status"] or "").strip()
-                                csv_end_date = str(row.get("End Date", "")).strip()
-                                db_end_date = str(existing_status["end_date"] or "").strip()
-                                csv_end_time = str(row.get("End Time", "")).strip()
-                                db_end_time = str(existing_status["end_time"] or "").strip()
-
-                                if (csv_status != db_status or
-                                    csv_end_date != db_end_date or
-                                    csv_end_time != db_end_time):
-                                    changed = True
+                                if "Action Status" in present_columns:
+                                    csv_status = str(row.get("Action Status", "")).strip()
+                                    db_status = str(existing_status["action_status"] or "").strip()
+                                    if csv_status != db_status:
+                                        changed = True
+                                if not changed and "End Date" in present_columns:
+                                    csv_end_date = str(row.get("End Date", "")).strip()
+                                    db_end_date = str(existing_status["end_date"] or "").strip()
+                                    if csv_end_date != db_end_date:
+                                        changed = True
+                                if not changed and "End Time" in present_columns:
+                                    csv_end_time = str(row.get("End Time", "")).strip()
+                                    db_end_time = str(existing_status["end_time"] or "").strip()
+                                    if csv_end_time != db_end_time:
+                                        changed = True
                         
                         if changed:
-                            # Update existing item core fields
+                            # Update existing item core fields (only pasted columns)
                             update_parts = []
                             values = []
                             for col in CORE_ITEM_FIELDS:
                                 csv_col = DB_TO_CSV.get(col)
                                 if csv_col:
-                                    update_parts.append(f"{col} = ?")
                                     frontend_key = BACKEND_TO_FRONTEND.get(col, csv_col)
+                                    if frontend_key not in present_columns:
+                                        continue
+                                    update_parts.append(f"{col} = ?")
                                     val = row.get(frontend_key, "")
                                     if col in DATE_FIELDS:
                                         val = normalize_date(val)
                                     values.append(val)
-                            values.append(item_id)
-                            cursor.execute(
-                                f"UPDATE items SET {', '.join(update_parts)} WHERE id = ?",
-                                values
-                            )
+                            if update_parts:
+                                values.append(item_id)
+                                cursor.execute(
+                                    f"UPDATE items SET {', '.join(update_parts)} WHERE id = ?",
+                                    values
+                                )
                             
-                            # Insert or update week status
-                            cursor.execute("""
-                                INSERT OR REPLACE INTO week_status (action_id, year, week, action_status, end_date, end_time)
-                                VALUES (?, ?, ?, ?, ?, ?)
-                            """, (item_id, year, week,
-                                  row.get("Action Status", ""),
-                                  normalize_date(row.get("End Date", "")),
-                                  row.get("End Time", "")))
+                            # Insert or update week status (merge with existing for omitted fields)
+                            if week_fields_present:
+                                cursor.execute("""
+                                    SELECT action_status, end_date, end_time
+                                    FROM week_status
+                                    WHERE action_id = ? AND year = ? AND week = ?
+                                """, (item_id, year, week))
+                                existing_status = cursor.fetchone()
+                                action_status = row.get("Action Status", "") if "Action Status" in present_columns else (
+                                    existing_status["action_status"] if existing_status else ""
+                                )
+                                end_date = normalize_date(row.get("End Date", "")) if "End Date" in present_columns else (
+                                    existing_status["end_date"] if existing_status else ""
+                                )
+                                end_time = row.get("End Time", "") if "End Time" in present_columns else (
+                                    existing_status["end_time"] if existing_status else ""
+                                )
+                                cursor.execute("""
+                                    INSERT OR REPLACE INTO week_status (action_id, year, week, action_status, end_date, end_time)
+                                    VALUES (?, ?, ?, ?, ?, ?)
+                                """, (item_id, year, week, action_status, end_date, end_time))
                             
                             updated_count += 1
                         else:
@@ -1112,7 +1393,8 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                 "new": new_count,
                 "updated": updated_count,
                 "skipped": skipped_count,
-                "errors": error_count
+                "errors": error_count,
+                "validation": validation_summary
             }).encode())
             
         except Exception as e:

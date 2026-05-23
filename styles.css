@@ -299,6 +299,18 @@ header .header-content.container {
     transform: translateX(100%);
 }
 
+.import-source-selector-wrapper {
+    width: 100%;
+}
+
+.import-source-selector.segmented-control {
+    width: 100%;
+}
+
+#import-source-paste:checked ~ .selection-slider {
+    transform: translateX(100%);
+}
+
 .calendar-input {
     height: 45px;
     padding: 0 1rem;
@@ -2129,5 +2141,120 @@ footer p {
     font-weight: 600;
     font-size: 1rem;
     color: var(--text-main);
+}
+
+/* File Drop Zone */
+.file-drop-zone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 180px;
+    min-height: 180px;
+    padding: 1.5rem;
+    border: 2px dashed var(--border);
+    border-radius: var(--border-radius);
+    background: var(--card-bg);
+    cursor: pointer;
+    transition: var(--transition);
+    text-align: center;
+    outline: none;
+}
+
+.file-drop-zone:hover,
+.file-drop-zone:focus-visible {
+    border-color: var(--primary);
+    background: rgba(37, 99, 235, 0.05);
+}
+
+.file-drop-zone.drag-over {
+    border-color: var(--primary);
+    border-style: solid;
+    background: rgba(37, 99, 235, 0.1);
+}
+
+.file-drop-zone.has-file {
+    border-style: solid;
+    border-color: var(--primary);
+    background: rgba(37, 99, 235, 0.05);
+    cursor: default;
+}
+
+[data-theme="dark"] .file-drop-zone:hover,
+[data-theme="dark"] .file-drop-zone:focus-visible {
+    background: rgba(59, 130, 246, 0.1);
+}
+
+[data-theme="dark"] .file-drop-zone.drag-over {
+    background: rgba(59, 130, 246, 0.15);
+}
+
+[data-theme="dark"] .file-drop-zone.has-file {
+    background: rgba(59, 130, 246, 0.1);
+}
+
+#import-paste-textarea {
+    height: 180px;
+    min-height: 180px;
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+.file-drop-empty,
+.file-drop-selected {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.file-drop-icon {
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.file-drop-hint {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--text-main);
+}
+
+.file-drop-browse {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.file-drop-meta {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.file-drop-filename {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-main);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-drop-clear {
+    margin-top: 0.25rem;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--primary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.file-drop-clear:hover {
+    color: var(--primary-dark);
 }
 

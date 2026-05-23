@@ -503,6 +503,59 @@
         </div>
     </div>
 
+    <!-- Import Options Modal -->
+    <div id="import-options-modal" class="modal" style="z-index: 3000;">
+        <div class="modal-content" style="max-width: 500px; margin-top: 20vh;">
+            <div class="modal-header">
+                <h3>Import Data</h3>
+                <span class="close-modal" id="close-import-modal">&times;</span>
+            </div>
+            <div style="margin-bottom: 1.5rem;">
+                <!-- <p style="margin-bottom: 1.5rem;">Import <strong id="import-modal-data-type">Incidents</strong> for the current week. Existing records are updated by number; new records are added.</p> -->
+                <div class="import-source-selector-wrapper" style="margin-bottom: 1.5rem;">
+                    <div class="segmented-control import-source-selector">
+                        <input type="radio" name="import-source" id="import-source-file" value="file" checked>
+                        <label for="import-source-file">CSV File</label>
+                        <input type="radio" name="import-source" id="import-source-paste" value="paste">
+                        <label for="import-source-paste">Paste Text</label>
+                        <div class="selection-slider"></div>
+                    </div>
+                </div>
+                <div id="import-file-panel">
+                    <div id="import-drop-zone" class="file-drop-zone" tabindex="0" role="button" aria-label="Choose CSV file">
+                        <div id="import-drop-empty" class="file-drop-empty">
+                            <svg class="file-drop-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            <p class="file-drop-hint">Drag &amp; drop your CSV here, or <span class="file-drop-browse">browse</span></p>
+                            <p class="file-drop-meta">.csv files only</p>
+                        </div>
+                        <div id="import-drop-selected" class="file-drop-selected" hidden>
+                            <svg class="file-drop-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                            </svg>
+                            <p id="import-file-name" class="file-drop-filename"></p>
+                            <p id="import-file-size" class="file-drop-meta"></p>
+                            <button type="button" id="import-clear-file-btn" class="file-drop-clear">Remove</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="import-paste-panel" style="display: none;">
+                    <!-- <label class="form-label" for="import-paste-textarea">Paste CSV content</label> -->
+                    <textarea id="import-paste-textarea" class="form-control" placeholder="Paste your csv data here..."></textarea>
+                    <!-- <p style="margin-top: 0.5rem; color: var(--text-muted); font-size: 0.85rem;">Paste directly from Excel or Sheets (tab-separated is supported). Include the <strong>Action No.</strong> column so existing records can be matched and updated. Multiline cells (e.g. Actions) are supported. Header rows are detected automatically.</p> -->
+                </div>
+            </div>
+            <div class="form-actions" style="display: flex; gap: 1rem; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary" id="cancel-import-modal">Cancel</button>
+                <button type="button" id="confirm-import-btn" class="btn btn-primary">Import</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Notification Modal -->
     <div id="notification-modal" class="modal" style="z-index: 3000;">
         <div class="modal-content" style="max-width: 400px; margin-top: 20vh;">
@@ -3638,59 +3691,245 @@
             // Import
             const importBtn = document.getElementById('import-btn');
             const importFileInput = document.getElementById('import-file-input');
+            const importModal = document.getElementById('import-options-modal');
+            const confirmImportBtn = document.getElementById('confirm-import-btn');
+            const cancelImportBtn = document.getElementById('cancel-import-modal');
+            const closeImportBtn = document.getElementById('close-import-modal');
+            const importDropZone = document.getElementById('import-drop-zone');
+            const importDropEmpty = document.getElementById('import-drop-empty');
+            const importDropSelected = document.getElementById('import-drop-selected');
+            const importFileName = document.getElementById('import-file-name');
+            const importFileSize = document.getElementById('import-file-size');
+            const importClearFileBtn = document.getElementById('import-clear-file-btn');
+            const importFilePanel = document.getElementById('import-file-panel');
+            const importPastePanel = document.getElementById('import-paste-panel');
+            const importPasteTextarea = document.getElementById('import-paste-textarea');
+            const importSourceRadios = document.querySelectorAll('input[name="import-source"]');
 
-            if (importBtn && importFileInput) {
+            let selectedImportFile = null;
+
+            function formatImportFileSize(bytes) {
+                if (bytes < 1024) return bytes + ' B';
+                if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+            }
+
+            function isCsvFile(file) {
+                if (!file) return false;
+                const name = file.name.toLowerCase();
+                if (name.endsWith('.csv')) return true;
+                const csvTypes = ['text/csv', 'application/vnd.ms-excel', 'text/plain'];
+                return csvTypes.includes(file.type);
+            }
+
+            function updateImportFileUI(file) {
+                if (importDropEmpty) importDropEmpty.hidden = !!file;
+                if (importDropSelected) importDropSelected.hidden = !file;
+                if (importDropZone) importDropZone.classList.toggle('has-file', !!file);
+                if (file) {
+                    if (importFileName) importFileName.textContent = file.name;
+                    if (importFileSize) importFileSize.textContent = formatImportFileSize(file.size);
+                } else {
+                    if (importFileName) importFileName.textContent = '';
+                    if (importFileSize) importFileSize.textContent = '';
+                }
+            }
+
+            function clearImportFile() {
+                selectedImportFile = null;
+                if (importFileInput) importFileInput.value = '';
+                updateImportFileUI(null);
+            }
+
+            function setSelectedImportFile(file) {
+                selectedImportFile = file;
+                updateImportFileUI(file);
+            }
+
+            function resetImportModal() {
+                clearImportFile();
+                if (importPasteTextarea) importPasteTextarea.value = '';
+                const fileRadio = document.querySelector('input[name="import-source"][value="file"]');
+                if (fileRadio) fileRadio.checked = true;
+                if (importFilePanel) importFilePanel.style.display = 'block';
+                if (importPastePanel) importPastePanel.style.display = 'none';
+            }
+
+            function updateImportSourcePanels() {
+                const selectedSource = document.querySelector('input[name="import-source"]:checked')?.value || 'file';
+                if (importFilePanel) importFilePanel.style.display = selectedSource === 'file' ? 'block' : 'none';
+                if (importPastePanel) importPastePanel.style.display = selectedSource === 'paste' ? 'block' : 'none';
+            }
+
+            function formatImportValidationMessage(data) {
+                const v = data.validation;
+                if (!v) return '';
+                let lines = [
+                    `Columns in header: ${v.header_columns ?? '—'}`,
+                    `Rows parsed: ${v.rows_parsed ?? '—'}`,
+                    `Rows valid: ${v.rows_valid ?? '—'}`
+                ];
+                if (v.rows_invalid && v.rows_invalid.length) {
+                    lines.push(`Rows with column mismatches: ${v.rows_invalid.join(', ')}`);
+                }
+                return lines.join('\n');
+            }
+
+            async function submitImport({ file, csvText }) {
+                const formData = new FormData();
+                if (file) formData.append('file', file);
+                if (csvText) formData.append('csv_text', csvText);
+                formData.append('year', currentYear);
+                formData.append('week', currentWeek);
+                formData.append('type', currentDataType);
+
+                try {
+                    const response = await fetch('/api/import', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const responseText = await response.text();
+                    let data;
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (e) {
+                        console.error('Failed to parse JSON response:', responseText);
+                        throw new Error('Invalid server response format');
+                    }
+
+                    if (response.ok && data.status === 'success') {
+                        const validationLines = formatImportValidationMessage(data);
+                        await showNotificationModal({
+                            title: 'Import Successful',
+                            message: `<strong>Import summary:</strong>\n\nNew records: ${data.new}\nUpdated records: ${data.updated}\nUnchanged records: ${data.skipped}\nErrors: ${data.errors}${validationLines ? '\n\n<strong>Validation:</strong>\n' + validationLines : ''}`,
+                            type: 'info',
+                            importData: data
+                        });
+                        loadDashboardData(getWeekPickerDateStr());
+                        return true;
+                    }
+
+                    const validationLines = formatImportValidationMessage(data);
+                    const detail = validationLines ? `\n\n${validationLines}` : '';
+                    throw new Error((data.message || 'Import failed') + detail);
+                } catch (error) {
+                    console.error('Import failed:', error);
+                    await showNotificationModal({
+                        title: 'Import Error',
+                        message: 'Failed to import data: ' + error.message,
+                        type: 'error'
+                    });
+                    return false;
+                }
+            }
+
+            if (importBtn && importModal) {
                 importBtn.addEventListener('click', () => {
-                    importFileInput.click();
+                    const importTypeText = document.getElementById('import-modal-data-type');
+                    if (importTypeText) {
+                        if (currentDataType === 'Crisis') importTypeText.textContent = 'Crises';
+                        else if (currentDataType === 'Miscellaneous') importTypeText.textContent = 'Tasks';
+                        else importTypeText.textContent = 'Incidents';
+                    }
+                    resetImportModal();
+                    importModal.style.display = 'block';
                 });
 
-                importFileInput.addEventListener('change', async (e) => {
-                    const file = e.target.files[0];
+                const closeImport = () => {
+                    importModal.style.display = 'none';
+                };
+
+                cancelImportBtn?.addEventListener('click', closeImport);
+                closeImportBtn?.addEventListener('click', closeImport);
+
+                importSourceRadios.forEach(radio => {
+                    radio.addEventListener('change', updateImportSourcePanels);
+                });
+
+                importDropZone?.addEventListener('click', () => {
+                    importFileInput?.click();
+                });
+
+                importDropZone?.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        importFileInput?.click();
+                    }
+                });
+
+                importClearFileBtn?.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    clearImportFile();
+                });
+
+                importDropZone?.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    importDropZone.classList.add('drag-over');
+                });
+
+                importDropZone?.addEventListener('dragleave', () => {
+                    importDropZone.classList.remove('drag-over');
+                });
+
+                importDropZone?.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    importDropZone.classList.remove('drag-over');
+                    const file = e.dataTransfer?.files?.[0];
                     if (!file) return;
-
-                    const formData = new FormData();
-                    formData.append('file', file);
-                    formData.append('year', currentYear);
-                    formData.append('week', currentWeek);
-                    formData.append('type', currentDataType);
-
-                    try {
-                        const response = await fetch('/api/import', {
-                            method: 'POST',
-                            body: formData
-                        });
-
-                        const responseText = await response.text();
-                        let data;
-                        try {
-                            data = JSON.parse(responseText);
-                        } catch (e) {
-                            console.error('Failed to parse JSON response:', responseText);
-                            throw new Error('Invalid server response format');
-                        }
-
-                        if (response.ok && data.status === 'success') {
-                            await showNotificationModal({
-                                title: 'Import Successful',
-                                message: `<strong>Import summary:</strong>\n\nNew records: ${data.new}\nUpdated records: ${data.updated}\nUnchanged records: ${data.skipped}\nErrors: ${data.errors}`,
-                                type: 'info',
-                                importData: data
-                            });
-                            // Reload current data to reflect the imported data
-                            loadDashboardData(getWeekPickerDateStr());
-                        } else {
-                            throw new Error(data.message || 'Import failed');
-                        }
-                    } catch (error) {
-                        console.error('Import failed:', error);
+                    if (!isCsvFile(file)) {
                         await showNotificationModal({
                             title: 'Import Error',
-                            message: 'Failed to import data: ' + error.message,
+                            message: 'Please drop a .csv file.',
                             type: 'error'
                         });
-                    } finally {
-                        // Reset file input so the same file can be selected again
-                        importFileInput.value = '';
+                        return;
+                    }
+                    setSelectedImportFile(file);
+                });
+
+                importFileInput?.addEventListener('change', (e) => {
+                    const file = e.target.files[0] || null;
+                    if (file && !isCsvFile(file)) {
+                        clearImportFile();
+                        showNotificationModal({
+                            title: 'Import Error',
+                            message: 'Please choose a .csv file.',
+                            type: 'error'
+                        });
+                        return;
+                    }
+                    setSelectedImportFile(file);
+                });
+
+                confirmImportBtn?.addEventListener('click', async () => {
+                    const selectedSource = document.querySelector('input[name="import-source"]:checked')?.value || 'file';
+
+                    if (selectedSource === 'file') {
+                        if (!selectedImportFile) {
+                            await showNotificationModal({
+                                title: 'Import Error',
+                                message: 'Please choose a CSV file to import.',
+                                type: 'error'
+                            });
+                            return;
+                        }
+
+                        const success = await submitImport({ file: selectedImportFile });
+                        if (success) closeImport();
+                    } else {
+                        const csvText = importPasteTextarea?.value?.trim();
+                        if (!csvText) {
+                            await showNotificationModal({
+                                title: 'Import Error',
+                                message: 'Please paste CSV content to import.',
+                                type: 'error'
+                            });
+                            return;
+                        }
+
+                        const success = await submitImport({ csvText });
+                        if (success) closeImport();
                     }
                 });
             }
