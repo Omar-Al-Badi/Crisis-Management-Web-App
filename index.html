@@ -1813,6 +1813,10 @@
                 `;
             }
 
+            function formatTabLabelWithCount(label, count) {
+                return count > 0 ? `${label} (${count})` : label;
+            }
+
             function renderRemarksActionsPanelHtml(config) {
                 const {
                     currentTab,
@@ -1826,6 +1830,8 @@
                 } = config;
                 const effectiveTab = actionsOnly ? 'actions' : currentTab;
                 const showActionScopeTabs = showScopeTabs && effectiveTab === 'actions';
+                const remarksCount = remarksData.length;
+                const actionsCount = actionsData.length;
                 const headerClass = actionsOnly
                     ? 'remarks-actions-header remarks-actions-header--actions-only'
                     : 'remarks-actions-header';
@@ -1834,9 +1840,9 @@
                             <div class="type-selector remarks-actions-tabs">
                                 <div class="segmented-control">
                                     <input type="radio" name="remarks-actions-tab" id="tab-remarks" value="remarks" ${currentTab === 'remarks' ? 'checked' : ''}>
-                                    <label for="tab-remarks">Remarks</label>
+                                    <label for="tab-remarks">${formatTabLabelWithCount('Remarks', remarksCount)}</label>
                                     <input type="radio" name="remarks-actions-tab" id="tab-items" value="actions" ${currentTab === 'actions' ? 'checked' : ''}>
-                                    <label for="tab-items">Actions</label>
+                                    <label for="tab-items">${formatTabLabelWithCount('Actions', actionsCount)}</label>
                                     <div class="selection-slider remarks-actions-slider"></div>
                                 </div>
                             </div>
@@ -1906,6 +1912,66 @@
                         </div>
                     </div>
                 `;
+            }
+
+            function buildIncidentPresentationSummary(item) {
+                const title = item['Crisis/Incident'] || 'N/A';
+                const startDate = formatDateForDisplay(item['Action Start Date'] || 'N/A');
+                const startTime = formatTimeAMPM(item['Start Time']);
+                const closed = isItemClosed(item);
+                const endDateRaw = item['End Date'];
+                const endTimeRaw = item['End Time'];
+                const hasEndDate = endDateRaw && endDateRaw.trim() && endDateRaw.toLowerCase() !== 'n/a';
+                const hasEndTime = endTimeRaw && endTimeRaw.trim() && endTimeRaw.toLowerCase() !== 'n/a';
+
+                let statusPhrase;
+                if (closed && hasEndDate && hasEndTime) {
+                    const endDate = formatDateForDisplay(endDateRaw);
+                    const endTime = formatTimeAMPM(endTimeRaw);
+                    statusPhrase = `closed on <strong>${endDate}</strong> at <strong>${endTime}</strong>`;
+                } else if (closed && hasEndDate) {
+                    const endDate = formatDateForDisplay(endDateRaw);
+                    statusPhrase = `closed on <strong>${endDate}</strong>`;
+                } else if (closed && hasEndTime) {
+                    const endTime = formatTimeAMPM(endTimeRaw);
+                    statusPhrase = `closed at <strong>${endTime}</strong>`;
+                } else if (closed) {
+                    statusPhrase = 'closed';
+                } else {
+                    statusPhrase = 'still open';
+                }
+
+                const owner = (item['Owner'] || '').trim();
+                const ownerSuffix = owner && owner.toLowerCase() !== 'n/a'
+                    ? ` and owned by <strong>${owner}</strong>`
+                    : '';
+
+                return `The <strong>${title}</strong> that occurred on <strong>${startDate}</strong>, at <strong>${startTime}</strong> which is ${statusPhrase}${ownerSuffix}.`;
+            }
+
+            function attachDetailMetaModeHandlers(container, defaultMode) {
+                if (!container) return;
+                const editPanel = container.querySelector('#detail-meta-edit');
+                const presentPanel = container.querySelector('#detail-meta-present');
+                const radios = container.querySelectorAll('input[name="detail-meta-mode"]');
+
+                function applyMode(mode) {
+                    const isPresent = mode === 'present';
+                    if (editPanel) editPanel.hidden = isPresent;
+                    if (presentPanel) presentPanel.hidden = !isPresent;
+                }
+
+                const initial = defaultMode || 'edit';
+                radios.forEach(radio => {
+                    radio.checked = radio.value === initial;
+                });
+                applyMode(initial);
+
+                radios.forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        if (e.target.checked) applyMode(e.target.value);
+                    });
+                });
             }
 
             function attachRemarksActionsHandlers(container, opts) {
@@ -3279,6 +3345,8 @@
                         assignee: document.getElementById('remark-action-assignee')?.value || '',
                         vendorTicket: document.getElementById('remark-action-vendor-ticket')?.value || ''
                     };
+                    const savedMetaMode = detailsContainer.querySelector('input[name="detail-meta-mode"]:checked')?.value || 'edit';
+                    const presentationSummary = buildIncidentPresentationSummary(item);
 
                     detailsContainer.innerHTML = `
                         <div class="detail-header">
@@ -3296,19 +3364,44 @@
                                     <span id="status-toggle-label" class="toggle-label" style="color: ${isClosed ? '#10b981' : '#ef4444'}">${currentStatusValue.toUpperCase()}</span>
                                 </div>
                             </div>
-                            <div class="detail-meta">
-                                <span><strong>${singular} No:</strong> <span class="editable-value" data-field="Action No.">${currentActionNo}</span><span class="edit-icon" title="Edit ${singular} No">✎</span></span>
-                                <span><strong>ITSM Ticket:</strong> <span class="editable-value" data-field="ITSM Ticket">${item['ITSM Ticket'] || 'N/A'}</span><span class="edit-icon" title="Edit ITSM Ticket">✎</span></span>
-                                <span><strong>System:</strong> <span class="editable-value" data-field="System">${currentSystemName}</span><span class="edit-icon" title="Edit System">✎</span></span>
-                                <span><strong>Owner:</strong> <span class="editable-value" data-field="Owner">${currentOwnerName}</span><span class="edit-icon" title="Edit Owner">✎</span></span>
-                                <span><strong>Start Date:</strong> <span class="editable-value" data-field="Action Start Date" data-is-date="true">${startDateDisplay}</span><span class="edit-icon" title="Edit Start Date">✎</span></span>
-                                <span><strong>Start Time:</strong> <span class="editable-value" data-field="Start Time" data-is-time="true">${formatTimeAMPM(item['Start Time'])}</span><span class="edit-icon" title="Edit Start Time">✎</span></span>
-                                <span><strong>Target Date:</strong> <span class="editable-value" data-field="Target Date" data-is-date="true">${targetDateDisplay}</span><span class="edit-icon" title="Edit Target Date">✎</span></span>
-                                <span><strong>Closure Date:</strong> <span id="detail-closure-date" class="editable-value" data-field="End Date" data-is-date="true">${formatDateForDisplay(item['End Date'])}</span><span class="edit-icon" title="Edit Closure Date">✎</span></span>
-                                <span><strong>End Time:</strong> <span id="detail-end-time" class="editable-value" data-field="End Time" data-is-time="true">${formatTimeAMPM(item['End Time'])}</span><span class="edit-icon" title="Edit End Time">✎</span></span>
-                                <span><strong>TTA:</strong> <span class="editable-value" data-field="Time to Acknowledge">${formatVal(item['Time to Acknowledge'])}</span><span class="edit-icon" title="Edit TTA">✎</span></span>
-                                <span><strong>TTR:</strong> <span class="editable-value" data-field="Time to Recover">${formatVal(item['Time to Recover'])}</span><span class="edit-icon" title="Edit TTR">✎</span></span>
-                                <span><strong>TTD:</strong> <span class="editable-value" data-field="Time to Detect">${formatVal(item['Time to Detect'])}</span><span class="edit-icon" title="Edit TTD">✎</span></span>
+                            <div class="detail-meta-controls">
+                                <div class="type-selector detail-meta-mode-tabs">
+                                    <div class="segmented-control detail-meta-mode-selector">
+                                        <input type="radio" name="detail-meta-mode" id="meta-mode-edit" value="edit" ${savedMetaMode === 'edit' ? 'checked' : ''}>
+                                        <label for="meta-mode-edit" title="Edit" aria-label="Edit">
+                                            <svg class="detail-meta-mode-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <path d="M12 20h9"></path>
+                                                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+                                            </svg>
+                                        </label>
+                                        <input type="radio" name="detail-meta-mode" id="meta-mode-present" value="present" ${savedMetaMode === 'present' ? 'checked' : ''}>
+                                        <label for="meta-mode-present" title="Present" aria-label="Present">
+                                            <svg class="detail-meta-mode-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <path d="M2 3h20"></path>
+                                                <path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"></path>
+                                                <path d="m7 21 5-5 5 5"></path>
+                                            </svg>
+                                        </label>
+                                        <div class="selection-slider detail-meta-mode-slider"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="detail-meta-wrapper">
+                                <div class="detail-meta detail-meta--edit" id="detail-meta-edit" ${savedMetaMode === 'present' ? 'hidden' : ''}>
+                                    <span><strong>${singular} No:</strong> <span class="editable-value" data-field="Action No.">${currentActionNo}</span><span class="edit-icon" title="Edit ${singular} No">✎</span></span>
+                                    <span><strong>ITSM Ticket:</strong> <span class="editable-value" data-field="ITSM Ticket">${item['ITSM Ticket'] || 'N/A'}</span><span class="edit-icon" title="Edit ITSM Ticket">✎</span></span>
+                                    <span><strong>System:</strong> <span class="editable-value" data-field="System">${currentSystemName}</span><span class="edit-icon" title="Edit System">✎</span></span>
+                                    <span><strong>Owner:</strong> <span class="editable-value" data-field="Owner">${currentOwnerName}</span><span class="edit-icon" title="Edit Owner">✎</span></span>
+                                    <span><strong>Start Date:</strong> <span class="editable-value" data-field="Action Start Date" data-is-date="true">${startDateDisplay}</span><span class="edit-icon" title="Edit Start Date">✎</span></span>
+                                    <span><strong>Start Time:</strong> <span class="editable-value" data-field="Start Time" data-is-time="true">${formatTimeAMPM(item['Start Time'])}</span><span class="edit-icon" title="Edit Start Time">✎</span></span>
+                                    <span><strong>Target Date:</strong> <span class="editable-value" data-field="Target Date" data-is-date="true">${targetDateDisplay}</span><span class="edit-icon" title="Edit Target Date">✎</span></span>
+                                    <span><strong>Closure Date:</strong> <span id="detail-closure-date" class="editable-value" data-field="End Date" data-is-date="true">${formatDateForDisplay(item['End Date'])}</span><span class="edit-icon" title="Edit Closure Date">✎</span></span>
+                                    <span><strong>End Time:</strong> <span id="detail-end-time" class="editable-value" data-field="End Time" data-is-time="true">${formatTimeAMPM(item['End Time'])}</span><span class="edit-icon" title="Edit End Time">✎</span></span>
+                                    <span><strong>TTA:</strong> <span class="editable-value" data-field="Time to Acknowledge">${formatVal(item['Time to Acknowledge'])}</span><span class="edit-icon" title="Edit TTA">✎</span></span>
+                                    <span><strong>TTR:</strong> <span class="editable-value" data-field="Time to Recover">${formatVal(item['Time to Recover'])}</span><span class="edit-icon" title="Edit TTR">✎</span></span>
+                                    <span><strong>TTD:</strong> <span class="editable-value" data-field="Time to Detect">${formatVal(item['Time to Detect'])}</span><span class="edit-icon" title="Edit TTD">✎</span></span>
+                                </div>
+                                <div class="detail-meta-present detail-meta--present" id="detail-meta-present" ${savedMetaMode === 'edit' ? 'hidden' : ''}>${presentationSummary}</div>
                             </div>
                         </div>
                         <div class="detail-grid">
@@ -3447,6 +3540,11 @@
                         closureDateSpanId: 'detail-closure-date',
                         endTimeSpanId: 'detail-end-time'
                     });
+
+                    attachDetailMetaModeHandlers(
+                        detailsContainer.querySelector('.detail-header'),
+                        savedMetaMode
+                    );
 
                     const panelRoot = detailsContainer.querySelector('.detail-item--actions-panel');
                     attachRemarksActionsHandlers(panelRoot, {
