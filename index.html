@@ -1915,6 +1915,11 @@
             }
 
             function buildIncidentPresentationSummary(item) {
+                function presentationVar(field, display, extraAttrs = '') {
+                    const attrs = extraAttrs ? ` ${extraAttrs}` : '';
+                    return `<span class="editable-value" data-field="${field}"${attrs}><strong>${display}</strong></span>`;
+                }
+
                 const title = item['Crisis/Incident'] || 'N/A';
                 const startDate = formatDateForDisplay(item['Action Start Date'] || 'N/A');
                 const startTime = formatTimeAMPM(item['Start Time']);
@@ -1928,13 +1933,13 @@
                 if (closed && hasEndDate && hasEndTime) {
                     const endDate = formatDateForDisplay(endDateRaw);
                     const endTime = formatTimeAMPM(endTimeRaw);
-                    statusPhrase = `closed on <strong>${endDate}</strong> at <strong>${endTime}</strong>`;
+                    statusPhrase = `closed on ${presentationVar('End Date', endDate, 'data-is-date="true"')} at ${presentationVar('End Time', endTime, 'data-is-time="true"')}`;
                 } else if (closed && hasEndDate) {
                     const endDate = formatDateForDisplay(endDateRaw);
-                    statusPhrase = `closed on <strong>${endDate}</strong>`;
+                    statusPhrase = `closed on ${presentationVar('End Date', endDate, 'data-is-date="true"')}`;
                 } else if (closed && hasEndTime) {
                     const endTime = formatTimeAMPM(endTimeRaw);
-                    statusPhrase = `closed at <strong>${endTime}</strong>`;
+                    statusPhrase = `closed at ${presentationVar('End Time', endTime, 'data-is-time="true"')}`;
                 } else if (closed) {
                     statusPhrase = 'closed';
                 } else {
@@ -1943,10 +1948,10 @@
 
                 const owner = (item['Owner'] || '').trim();
                 const ownerSuffix = owner && owner.toLowerCase() !== 'n/a'
-                    ? ` and owned by <strong>${owner}</strong>`
+                    ? ` and owned by ${presentationVar('Owner', owner)}`
                     : '';
 
-                return `The <strong>${title}</strong> that occurred on <strong>${startDate}</strong>, at <strong>${startTime}</strong> which is ${statusPhrase}${ownerSuffix}.`;
+                return `The ${presentationVar('Crisis/Incident', title)} that occurred on ${presentationVar('Action Start Date', startDate, 'data-is-date="true"')}, at ${presentationVar('Start Time', startTime, 'data-is-time="true"')} which is ${statusPhrase}${ownerSuffix}.`;
             }
 
             function attachDetailMetaModeHandlers(container, defaultMode) {

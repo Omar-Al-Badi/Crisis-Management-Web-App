@@ -1149,10 +1149,6 @@ input:checked + .slider:before {
 
 .detail-meta-present {
     width: 100%;
-    padding: 0.75rem 1rem;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
     color: var(--text);
     font-size: 1rem;
     line-height: 1.6;
@@ -1169,6 +1165,10 @@ input:checked + .slider:before {
 .detail-meta-present strong {
     color: var(--text);
     font-weight: 700;
+}
+
+.detail-meta-present .editable-value:hover {
+    border-bottom-color: var(--warning);
 }
 
 .edit-icon {
@@ -1502,7 +1502,8 @@ input:checked + .slider:before {
     padding-right: 8rem;
 }
 
-.modal-content .description-box {
+.modal-content .description-box,
+.modal-content .detail-meta-present {
     padding: 0.4rem 0.5rem 0.4rem 1rem;
     margin-top: 0.15rem;
     margin-bottom: 0.35rem;
@@ -1910,7 +1911,8 @@ input:checked + .slider:before {
     white-space: pre-wrap;
 }
 
-.description-box {
+.description-box,
+.detail-meta-present {
     background: rgba(245, 158, 11, 0.05);
     padding: 0.6rem 0.75rem 0.6rem 1rem;
     border-radius: 8px;
@@ -1920,7 +1922,8 @@ input:checked + .slider:before {
     margin-top: 0.25rem;
 }
 
-[data-theme="dark"] .description-box {
+[data-theme="dark"] .description-box,
+[data-theme="dark"] .detail-meta-present {
     background: rgba(245, 158, 11, 0.1);
 }
 
