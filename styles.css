@@ -1162,6 +1162,75 @@ input:checked + .slider:before {
     display: none !important;
 }
 
+.detail-meta.detail-meta--edit {
+    display: block;
+    flex-wrap: unset;
+    background: var(--hover-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem;
+}
+
+.detail-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5rem;
+    align-items: stretch;
+    width: 100%;
+}
+
+.detail-meta-col {
+    display: flex;
+    flex-direction: column;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-left-width: 4px;
+    border-left-color: var(--warning);
+    background: rgba(245, 158, 11, 0.05);
+}
+
+[data-theme="dark"] .detail-meta-col {
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.detail-meta-row {
+    padding: 0.35rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+    font-size: inherit;
+    line-height: 1.4;
+}
+
+.detail-meta-row:last-child {
+    border-bottom: none;
+}
+
+.detail-meta-row > span {
+    display: inline;
+}
+
+/* Match incident title / description edit pencils (scaleX flip needs inline-block) */
+.detail-meta--edit .edit-icon {
+    display: inline-block;
+    transform: scaleX(-1);
+}
+
+.detail-meta--edit .edit-icon:hover {
+    transform: scaleX(-1) scale(1.2);
+}
+
+@media (max-width: 640px) {
+    .detail-meta-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 420px) {
+    .detail-meta-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .detail-meta-present strong {
     color: var(--text);
     font-weight: 700;

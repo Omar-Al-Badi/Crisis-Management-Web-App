@@ -134,12 +134,14 @@
                         <label class="column-option"><input type="checkbox" checked data-column="8"> Start Date</label>
                         <label class="column-option"><input type="checkbox" checked data-column="9"> Start Time</label>
                         <label class="column-option"><input type="checkbox" checked data-column="10"> Target Date</label>
-                        <label class="column-option"><input type="checkbox" checked data-column="11"> Closure Date</label>
-                        <label class="column-option"><input type="checkbox" checked data-column="12"> End Time</label>
-                        <label class="column-option"><input type="checkbox" checked data-column="13"> Age</label>
-                        <label class="column-option"><input type="checkbox" checked data-column="14"> TTA</label>
-                        <label class="column-option"><input type="checkbox" checked data-column="15"> TTR</label>
-                        <label class="column-option"><input type="checkbox" checked data-column="16"> TTD</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="11"> Resolution Date</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="12"> Resolution Time</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="13"> Closure Date</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="14"> Closure Time</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="15"> Age</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="16"> TTA</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="17"> TTR</label>
+                        <label class="column-option"><input type="checkbox" checked data-column="18"> TTD</label>
                     </div>
                 </div>
                 <label for="row-limit">Show Rows:</label>
@@ -175,12 +177,14 @@
                         <th data-column="8">Incident Start Date</th>
                         <th data-column="9">Start Time</th>
                         <th data-column="10">Target Date</th>
-                        <th data-column="11">Closure Date</th>
-                        <th data-column="12">End Time</th>
-                        <th data-column="13">Age</th>
-                        <th data-column="14">TTA</th>
-                        <th data-column="15">TTR</th>
-                        <th data-column="16">TTD</th>
+                        <th data-column="11">Resolution Date</th>
+                        <th data-column="12">Resolution Time</th>
+                        <th data-column="13">Closure Date</th>
+                        <th data-column="14">Closure Time</th>
+                        <th data-column="15">Age</th>
+                        <th data-column="16">TTA</th>
+                        <th data-column="17">TTR</th>
+                        <th data-column="18">TTD</th>
                         <!-- <th>Postponed</th> -->
                     </tr>
                 </thead>
@@ -270,79 +274,24 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label" for="new-end-time">End Time (Optional)</label>
+                        <label class="form-label" for="new-resolution-date-display">Resolution Date (Optional)</label>
+                        <div style="position: relative;">
+                            <input type="text" id="new-resolution-date-display" class="form-control" placeholder="dd/mm/yyyy">
+                            <input type="date" id="new-resolution-date-hidden" style="position: absolute; top: 0; left: 0; opacity: 0; width: 100%; height: 100%; pointer-events: none;">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="new-resolution-time">Resolution Time (Optional)</label>
+                        <div class="input-with-btn">
+                            <input type="time" id="new-resolution-time" class="form-control">
+                            <button type="button" class="btn-now" data-target="new-resolution-time">Now</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="new-end-time">Closure Time (Optional)</label>
                         <div class="input-with-btn">
                             <input type="time" id="new-end-time" class="form-control">
                             <button type="button" class="btn-now" data-target="new-end-time">Now</button>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="new-tta">Time to Acknowledge (TTA)</label>
-                        <div class="duration-input-group">
-                            <div class="duration-part">
-                                <label>DD</label>
-                                <div class="number-input-wrapper">
-                                    <input type="number" id="new-tta-dd" class="form-control" min="0" placeholder="0">
-                                </div>
-                            </div>
-                            <div class="duration-part">
-                                <label>HH</label>
-                                <div class="number-input-wrapper">
-                                    <input type="number" id="new-tta-hh" class="form-control" min="0" max="23" placeholder="0">
-                                </div>
-                            </div>
-                            <div class="duration-part">
-                                <label>MM</label>
-                                <div class="number-input-wrapper">
-                                    <input type="number" id="new-tta-mm" class="form-control" min="0" max="59" placeholder="0">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="new-ttr">Time to Recover (TTR)</label>
-                        <div class="duration-input-group">
-                            <div class="duration-part">
-                                <label>DD</label>
-                                <div class="number-input-wrapper">
-                                    <input type="number" id="new-ttr-dd" class="form-control" min="0" placeholder="0">
-                                </div>
-                            </div>
-                            <div class="duration-part">
-                                <label>HH</label>
-                                <div class="number-input-wrapper">
-                                    <input type="number" id="new-ttr-hh" class="form-control" min="0" max="23" placeholder="0">
-                                </div>
-                            </div>
-                            <div class="duration-part">
-                                <label>MM</label>
-                                <div class="number-input-wrapper">
-                                    <input type="number" id="new-ttr-mm" class="form-control" min="0" max="59" placeholder="0">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="new-ttd">Time to Detect (TTD)</label>
-                        <div class="duration-input-group">
-                            <div class="duration-part">
-                                <label>DD</label>
-                                <div class="number-input-wrapper">
-                                    <input type="number" id="new-ttd-dd" class="form-control" min="0" placeholder="0">
-                                </div>
-                            </div>
-                            <div class="duration-part">
-                                <label>HH</label>
-                                <div class="number-input-wrapper">
-                                    <input type="number" id="new-ttd-hh" class="form-control" min="0" max="23" placeholder="0">
-                                </div>
-                            </div>
-                            <div class="duration-part">
-                                <label>MM</label>
-                                <div class="number-input-wrapper">
-                                    <input type="number" id="new-ttd-mm" class="form-control" min="0" max="59" placeholder="0">
-                                </div>
-                            </div>
                         </div>
                     </div>
                     <div id="new-reference-group" class="form-group" style="display: none;">
@@ -650,10 +599,19 @@
             const dbInitBanner = document.getElementById('db-init-banner');
             const emptyWeekHint = document.getElementById('empty-week-hint');
 
-            const DEFAULT_VISIBLE_DATA_COLUMNS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+            const DEFAULT_VISIBLE_DATA_COLUMNS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+            function migrateIncidentVisibleColumns(cols) {
+                if (!Array.isArray(cols) || !cols.length) return DEFAULT_VISIBLE_DATA_COLUMNS.slice();
+                const max = Math.max(...cols);
+                if (max > 16) return cols.filter(c => typeof c === 'number' && c >= 1 && c <= 18);
+                const migrated = [...new Set(cols.map(c => (c >= 11 ? c + 2 : c)))];
+                if (!migrated.includes(11)) migrated.push(11);
+                if (!migrated.includes(12)) migrated.push(12);
+                return migrated.filter(c => c >= 1 && c <= 18).sort((a, b) => a - b);
+            }
             let visibleColumnsRaw = JSON.parse(localStorage.getItem('visibleColumns'));
             let visibleColumns = Array.isArray(visibleColumnsRaw) && visibleColumnsRaw.length
-                ? visibleColumnsRaw.filter(c => typeof c === 'number' && c >= 1 && c <= 16)
+                ? migrateIncidentVisibleColumns(visibleColumnsRaw.filter(c => typeof c === 'number'))
                 : DEFAULT_VISIBLE_DATA_COLUMNS.slice();
             if (!visibleColumns.length) {
                 visibleColumns = DEFAULT_VISIBLE_DATA_COLUMNS.slice();
@@ -670,6 +628,8 @@
             const newStartDateDisplay = document.getElementById('new-start-date-display');
             const newTargetDateHidden = document.getElementById('new-target-date-hidden');
             const newTargetDateDisplay = document.getElementById('new-target-date-display');
+            const newResolutionDateHidden = document.getElementById('new-resolution-date-hidden');
+            const newResolutionDateDisplay = document.getElementById('new-resolution-date-display');
             const newMiscTaskNoInput = document.getElementById('new-misc-task-no');
             const newMiscCreatedDateHidden = document.getElementById('new-misc-created-date-hidden');
             const newMiscCreatedDateDisplay = document.getElementById('new-misc-created-date-display');
@@ -680,6 +640,7 @@
             // Setup dual pickers for new incident form
             setupDualDatePicker(newStartDateDisplay, newStartDateHidden);
             setupDualDatePicker(newTargetDateDisplay, newTargetDateHidden);
+            setupDualDatePicker(newResolutionDateDisplay, newResolutionDateHidden);
             setupDualDatePicker(newMiscCreatedDateDisplay, newMiscCreatedDateHidden);
             setupDualDatePicker(newMiscDueDateDisplay, newMiscDueDateHidden);
 
@@ -794,25 +755,11 @@
                     const startDate = newStartDateHidden ? newStartDateHidden.value : '';
                     const startTime = document.getElementById('new-start-time')?.value || '';
                     const targetDate = newTargetDateHidden ? newTargetDateHidden.value : '';
+                    const resolutionDate = newResolutionDateHidden ? newResolutionDateHidden.value : '';
+                    const resolutionTime = document.getElementById('new-resolution-time')?.value || '';
                     const endTime = document.getElementById('new-end-time')?.value || '';
                     const description = document.getElementById('new-description')?.value.trim() || '';
                     const crisisReference = document.getElementById('new-reference')?.value || '';
-                    
-                    const tta = formatDuration(
-                        parseInt(document.getElementById('new-tta-dd')?.value) || 0,
-                        parseInt(document.getElementById('new-tta-hh')?.value) || 0,
-                        parseInt(document.getElementById('new-tta-mm')?.value) || 0
-                    );
-                    const ttr = formatDuration(
-                        parseInt(document.getElementById('new-ttr-dd')?.value) || 0,
-                        parseInt(document.getElementById('new-ttr-hh')?.value) || 0,
-                        parseInt(document.getElementById('new-ttr-mm')?.value) || 0
-                    );
-                    const ttd = formatDuration(
-                        parseInt(document.getElementById('new-ttd-dd')?.value) || 0,
-                        parseInt(document.getElementById('new-ttd-hh')?.value) || 0,
-                        parseInt(document.getElementById('new-ttd-mm')?.value) || 0
-                    );
                     
                     // Calculate initial Age with time precision
                     let initialAgeStr = "00:00";
@@ -850,11 +797,13 @@
                         "Action Start Date": startDate,
                         "Start Time": startTime, // Store in 24-hour format (HH:MM)
                         "Target Date": targetDate,
+                        "Resolution Date": resolutionDate,
+                        "Resolution Time": resolutionTime,
                         "Description": description,
                         "Remarks": "",
                         "Actions": "",
                         "End Date": "",
-                        "End Time": endTime, // Store in 24-hour format (HH:MM)
+                        "Closure Time": endTime, // Store in 24-hour format (HH:MM)
                         "Section Head": "IT Operations", // Defaults for CSV columns
                         "Category": "Infrastructure",
                         "Action Tracker ( Weekly Crisis Meeting)": "",
@@ -864,9 +813,9 @@
                         "Age": initialAgeStr,
                         "Age By Months/Year": "0",
                         "Crisis Reference": crisisReference,
-                        "Time to Acknowledge": tta,
-                        "Time to Recover": ttr,
-                        "Time to Detect": ttd,
+                        "Time to Acknowledge": "N/A",
+                        "Time to Recover": "N/A",
+                        "Time to Detect": "N/A",
                         "History": "[]"
                     };
 
@@ -945,7 +894,7 @@
                     if (addMiscFields) addMiscFields.style.display = 'block';
                 } else {
                     if (savedIncidentVisibleColumns) {
-                        visibleColumns = savedIncidentVisibleColumns.filter(c => c >= 1 && c <= 16);
+                        visibleColumns = migrateIncidentVisibleColumns(savedIncidentVisibleColumns);
                         savedIncidentVisibleColumns = null;
                         localStorage.setItem('visibleColumns', JSON.stringify(visibleColumns));
                     }
@@ -963,12 +912,14 @@
                             <th data-column="8">${singular} Start Date</th>
                             <th data-column="9">Start Time</th>
                             <th data-column="10">Target Date</th>
-                            <th data-column="11">Closure Date</th>
-                            <th data-column="12">End Time</th>
-                            <th data-column="13">Age</th>
-                            <th data-column="14">TTA</th>
-                            <th data-column="15">TTR</th>
-                            <th data-column="16">TTD</th>
+                            <th data-column="11">Resolution Date</th>
+                            <th data-column="12">Resolution Time</th>
+                            <th data-column="13">Closure Date</th>
+                            <th data-column="14">Closure Time</th>
+                            <th data-column="15">Age</th>
+                            <th data-column="16">TTA</th>
+                            <th data-column="17">TTR</th>
+                            <th data-column="18">TTD</th>
                         `;
                     }
                     if (dropdown) {
@@ -984,12 +935,14 @@
                             <label class="column-option"><input type="checkbox" checked data-column="8"> Start Date</label>
                             <label class="column-option"><input type="checkbox" checked data-column="9"> Start Time</label>
                             <label class="column-option"><input type="checkbox" checked data-column="10"> Target Date</label>
-                            <label class="column-option"><input type="checkbox" checked data-column="11"> Closure Date</label>
-                            <label class="column-option"><input type="checkbox" checked data-column="12"> End Time</label>
-                            <label class="column-option"><input type="checkbox" checked data-column="13"> Age</label>
-                            <label class="column-option"><input type="checkbox" checked data-column="14"> TTA</label>
-                            <label class="column-option"><input type="checkbox" checked data-column="15"> TTR</label>
-                            <label class="column-option"><input type="checkbox" checked data-column="16"> TTD</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="11"> Resolution Date</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="12"> Resolution Time</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="13"> Closure Date</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="14"> Closure Time</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="15"> Age</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="16"> TTA</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="17"> TTR</label>
+                            <label class="column-option"><input type="checkbox" checked data-column="18"> TTD</label>
                         `;
                         wireColumnVisibilityCheckboxes(dropdown);
                     }
@@ -1314,12 +1267,14 @@
                     8: 'Action Start Date',
                     9: 'Start Time',
                     10: 'Target Date',
-                    11: 'End Date',
-                    12: 'End Time',
-                    13: 'Age',
-                    14: 'Time to Acknowledge',
-                    15: 'Time to Recover',
-                    16: 'Time to Detect'
+                    11: 'Resolution Date',
+                    12: 'Resolution Time',
+                    13: 'End Date',
+                    14: 'Closure Time',
+                    15: 'Age',
+                    16: 'Time to Acknowledge',
+                    17: 'Time to Recover',
+                    18: 'Time to Detect'
                 };
 
                 const key = columnMap[columnIndex];
@@ -1338,15 +1293,15 @@
                             : sB.localeCompare(sA, undefined, { numeric: true, sensitivity: 'base' });
                     }
 
-                    const dateCols = isMiscMode() ? [7, 8] : [8, 10, 11];
+                    const dateCols = isMiscMode() ? [7, 8] : [8, 10, 11, 13];
                     if (dateCols.includes(columnIndex)) { // Dates
                         const dateA = parseDateUniversal(valA) || new Date(0);
                         const dateB = parseDateUniversal(valB) || new Date(0);
                         return order === 'asc' ? dateA - dateB : dateB - dateA;
                     }
 
-                    const timeCols = isMiscMode() ? [] : [9, 12];
-                    if (timeCols.includes(columnIndex)) { // Times (Start/End)
+                    const timeCols = isMiscMode() ? [] : [9, 12, 14];
+                    if (timeCols.includes(columnIndex)) { // Times (Start/Resolution/Closure)
                         const parseTime = (t) => {
                             if (!t || t === 'N/A') return -1;
                             let h = 0, m = 0;
@@ -1365,7 +1320,7 @@
                         return order === 'asc' ? tA - tB : tB - tA;
                     }
 
-                    const ageCols = isMiscMode() ? [9] : [13, 14, 15, 16];
+                    const ageCols = isMiscMode() ? [9] : [15, 16, 17, 18];
                     if (ageCols.includes(columnIndex)) { // Durations/Age
                         const parseToMins = (str) => {
                             if (!str || str === 'N/A') return -1;
@@ -1923,9 +1878,27 @@
                 const title = item['Crisis/Incident'] || 'N/A';
                 const startDate = formatDateForDisplay(item['Action Start Date'] || 'N/A');
                 const startTime = formatTimeAMPM(item['Start Time']);
+                const resolutionDateRaw = item['Resolution Date'];
+                const resolutionTimeRaw = item['Resolution Time'];
+                const hasResolutionDate = resolutionDateRaw && resolutionDateRaw.trim() && resolutionDateRaw.toLowerCase() !== 'n/a';
+                const hasResolutionTime = resolutionTimeRaw && resolutionTimeRaw.trim() && resolutionTimeRaw.toLowerCase() !== 'n/a';
+
+                let resolutionPhrase = '';
+                if (hasResolutionDate && hasResolutionTime) {
+                    const resDate = formatDateForDisplay(resolutionDateRaw);
+                    const resTime = formatTimeAMPM(resolutionTimeRaw);
+                    resolutionPhrase = `resolved on ${presentationVar('Resolution Date', resDate, 'data-is-date="true"')} at ${presentationVar('Resolution Time', resTime, 'data-is-time="true"')}`;
+                } else if (hasResolutionDate) {
+                    const resDate = formatDateForDisplay(resolutionDateRaw);
+                    resolutionPhrase = `resolved on ${presentationVar('Resolution Date', resDate, 'data-is-date="true"')}`;
+                } else if (hasResolutionTime) {
+                    const resTime = formatTimeAMPM(resolutionTimeRaw);
+                    resolutionPhrase = `resolved at ${presentationVar('Resolution Time', resTime, 'data-is-time="true"')}`;
+                }
+
                 const closed = isItemClosed(item);
                 const endDateRaw = item['End Date'];
-                const endTimeRaw = item['End Time'];
+                const endTimeRaw = item['Closure Time'];
                 const hasEndDate = endDateRaw && endDateRaw.trim() && endDateRaw.toLowerCase() !== 'n/a';
                 const hasEndTime = endTimeRaw && endTimeRaw.trim() && endTimeRaw.toLowerCase() !== 'n/a';
 
@@ -1933,25 +1906,29 @@
                 if (closed && hasEndDate && hasEndTime) {
                     const endDate = formatDateForDisplay(endDateRaw);
                     const endTime = formatTimeAMPM(endTimeRaw);
-                    statusPhrase = `closed on ${presentationVar('End Date', endDate, 'data-is-date="true"')} at ${presentationVar('End Time', endTime, 'data-is-time="true"')}`;
+                    statusPhrase = `closed on ${presentationVar('End Date', endDate, 'data-is-date="true"')} at ${presentationVar('Closure Time', endTime, 'data-is-time="true"')}`;
                 } else if (closed && hasEndDate) {
                     const endDate = formatDateForDisplay(endDateRaw);
                     statusPhrase = `closed on ${presentationVar('End Date', endDate, 'data-is-date="true"')}`;
                 } else if (closed && hasEndTime) {
                     const endTime = formatTimeAMPM(endTimeRaw);
-                    statusPhrase = `closed at ${presentationVar('End Time', endTime, 'data-is-time="true"')}`;
+                    statusPhrase = `closed at ${presentationVar('Closure Time', endTime, 'data-is-time="true"')}`;
                 } else if (closed) {
                     statusPhrase = 'closed';
                 } else {
                     statusPhrase = 'still open';
                 }
 
+                const lifecyclePhrase = resolutionPhrase
+                    ? `${resolutionPhrase} and ${statusPhrase}`
+                    : statusPhrase;
+
                 const owner = (item['Owner'] || '').trim();
                 const ownerSuffix = owner && owner.toLowerCase() !== 'n/a'
                     ? ` and owned by ${presentationVar('Owner', owner)}`
                     : '';
 
-                return `The ${presentationVar('Crisis/Incident', title)} that occurred on ${presentationVar('Action Start Date', startDate, 'data-is-date="true"')}, at ${presentationVar('Start Time', startTime, 'data-is-time="true"')} which is ${statusPhrase}${ownerSuffix}.`;
+                return `The ${presentationVar('Crisis/Incident', title)} that occurred on ${presentationVar('Action Start Date', startDate, 'data-is-date="true"')}, at ${presentationVar('Start Time', startTime, 'data-is-time="true"')} which is ${lifecyclePhrase}${ownerSuffix}.`;
             }
 
             function attachDetailMetaModeHandlers(container, defaultMode) {
@@ -2915,7 +2892,7 @@
                         // Parse end date and time safely
                         if (isClosed) {
                             const endDateRaw = item['End Date'];
-                            const endTimeRaw = item['End Time'];
+                            const endTimeRaw = item['Closure Time'];
                             end = parseDateUniversal(endDateRaw);
                             if (end && !isNaN(end.getTime())) {
                                 let hh = 0, mm = 0;
@@ -2984,8 +2961,10 @@
                         <td>${formatDateForDisplay(item['Action Start Date'])}</td>
                         <td>${formatTimeAMPM(item['Start Time'])}</td>
                         <td>${formatDateForDisplay(item['Target Date'])}</td>
+                        <td>${formatDateForDisplay(item['Resolution Date'])}</td>
+                        <td>${formatTimeAMPM(item['Resolution Time'])}</td>
                         <td>${formatDateForDisplay(endDate)}</td>
-                        <td>${formatTimeAMPM(item['End Time'])}</td>
+                        <td>${formatTimeAMPM(item['Closure Time'])}</td>
                         <td class="age-column ${!isClosed ? 'urgent' : ''}">${ageDisplay}</td>
                         <td>${formatVal(item['Time to Acknowledge'])}</td>
                         <td>${formatVal(item['Time to Recover'])}</td>
@@ -3393,18 +3372,30 @@
                             </div>
                             <div class="detail-meta-wrapper">
                                 <div class="detail-meta detail-meta--edit" id="detail-meta-edit" ${savedMetaMode === 'present' ? 'hidden' : ''}>
-                                    <span><strong>${singular} No:</strong> <span class="editable-value" data-field="Action No.">${currentActionNo}</span><span class="edit-icon" title="Edit ${singular} No">✎</span></span>
-                                    <span><strong>ITSM Ticket:</strong> <span class="editable-value" data-field="ITSM Ticket">${item['ITSM Ticket'] || 'N/A'}</span><span class="edit-icon" title="Edit ITSM Ticket">✎</span></span>
-                                    <span><strong>System:</strong> <span class="editable-value" data-field="System">${currentSystemName}</span><span class="edit-icon" title="Edit System">✎</span></span>
-                                    <span><strong>Owner:</strong> <span class="editable-value" data-field="Owner">${currentOwnerName}</span><span class="edit-icon" title="Edit Owner">✎</span></span>
-                                    <span><strong>Start Date:</strong> <span class="editable-value" data-field="Action Start Date" data-is-date="true">${startDateDisplay}</span><span class="edit-icon" title="Edit Start Date">✎</span></span>
-                                    <span><strong>Start Time:</strong> <span class="editable-value" data-field="Start Time" data-is-time="true">${formatTimeAMPM(item['Start Time'])}</span><span class="edit-icon" title="Edit Start Time">✎</span></span>
-                                    <span><strong>Target Date:</strong> <span class="editable-value" data-field="Target Date" data-is-date="true">${targetDateDisplay}</span><span class="edit-icon" title="Edit Target Date">✎</span></span>
-                                    <span><strong>Closure Date:</strong> <span id="detail-closure-date" class="editable-value" data-field="End Date" data-is-date="true">${formatDateForDisplay(item['End Date'])}</span><span class="edit-icon" title="Edit Closure Date">✎</span></span>
-                                    <span><strong>End Time:</strong> <span id="detail-end-time" class="editable-value" data-field="End Time" data-is-time="true">${formatTimeAMPM(item['End Time'])}</span><span class="edit-icon" title="Edit End Time">✎</span></span>
-                                    <span><strong>TTA:</strong> <span class="editable-value" data-field="Time to Acknowledge">${formatVal(item['Time to Acknowledge'])}</span><span class="edit-icon" title="Edit TTA">✎</span></span>
-                                    <span><strong>TTR:</strong> <span class="editable-value" data-field="Time to Recover">${formatVal(item['Time to Recover'])}</span><span class="edit-icon" title="Edit TTR">✎</span></span>
-                                    <span><strong>TTD:</strong> <span class="editable-value" data-field="Time to Detect">${formatVal(item['Time to Detect'])}</span><span class="edit-icon" title="Edit TTD">✎</span></span>
+                                    <div class="detail-meta-grid">
+                                        <div class="detail-meta-col detail-meta-col--identity">
+                                            <div class="detail-meta-row"><span><strong>${singular} No:</strong> <span class="editable-value" data-field="Action No.">${currentActionNo}</span><span class="edit-icon" title="Edit ${singular} No">✎</span></span></div>
+                                            <div class="detail-meta-row"><span><strong>ITSM Ticket:</strong> <span class="editable-value" data-field="ITSM Ticket">${item['ITSM Ticket'] || 'N/A'}</span><span class="edit-icon" title="Edit ITSM Ticket">✎</span></span></div>
+                                            <div class="detail-meta-row"><span><strong>System:</strong> <span class="editable-value" data-field="System">${currentSystemName}</span><span class="edit-icon" title="Edit System">✎</span></span></div>
+                                            <div class="detail-meta-row"><span><strong>Owner:</strong> <span class="editable-value" data-field="Owner">${currentOwnerName}</span><span class="edit-icon" title="Edit Owner">✎</span></span></div>
+                                        </div>
+                                        <div class="detail-meta-col detail-meta-col--timeline">
+                                            <div class="detail-meta-row"><span><strong>Start Date:</strong> <span class="editable-value" data-field="Action Start Date" data-is-date="true">${startDateDisplay}</span><span class="edit-icon" title="Edit Start Date">✎</span></span></div>
+                                            <div class="detail-meta-row"><span><strong>Start Time:</strong> <span class="editable-value" data-field="Start Time" data-is-time="true">${formatTimeAMPM(item['Start Time'])}</span><span class="edit-icon" title="Edit Start Time">✎</span></span></div>
+                                            <div class="detail-meta-row"><span><strong>Resolution Date:</strong> <span class="editable-value" data-field="Resolution Date" data-is-date="true">${formatDateForDisplay(item['Resolution Date'])}</span><span class="edit-icon" title="Edit Resolution Date">✎</span></span></div>
+                                            <div class="detail-meta-row"><span><strong>Resolution Time:</strong> <span class="editable-value" data-field="Resolution Time" data-is-time="true">${formatTimeAMPM(item['Resolution Time'])}</span><span class="edit-icon" title="Edit Resolution Time">✎</span></span></div>
+                                        </div>
+                                        <div class="detail-meta-col detail-meta-col--closure">
+                                            <div class="detail-meta-row"><span><strong>Target Date:</strong> <span class="editable-value" data-field="Target Date" data-is-date="true">${targetDateDisplay}</span><span class="edit-icon" title="Edit Target Date">✎</span></span></div>
+                                            <div class="detail-meta-row"><span><strong>Closure Date:</strong> <span id="detail-closure-date" class="editable-value" data-field="End Date" data-is-date="true">${formatDateForDisplay(item['End Date'])}</span><span class="edit-icon" title="Edit Closure Date">✎</span></span></div>
+                                            <div class="detail-meta-row"><span><strong>Closure Time:</strong> <span id="detail-end-time" class="editable-value" data-field="Closure Time" data-is-time="true">${formatTimeAMPM(item['Closure Time'])}</span><span class="edit-icon" title="Edit Closure Time">✎</span></span></div>
+                                        </div>
+                                        <div class="detail-meta-col detail-meta-col--metrics">
+                                            <div class="detail-meta-row"><span><strong>TTA:</strong> <span class="editable-value" data-field="Time to Acknowledge">${formatVal(item['Time to Acknowledge'])}</span><span class="edit-icon" title="Edit TTA">✎</span></span></div>
+                                            <div class="detail-meta-row"><span><strong>TTR:</strong> <span class="editable-value" data-field="Time to Recover">${formatVal(item['Time to Recover'])}</span><span class="edit-icon" title="Edit TTR">✎</span></span></div>
+                                            <div class="detail-meta-row"><span><strong>TTD:</strong> <span class="editable-value" data-field="Time to Detect">${formatVal(item['Time to Detect'])}</span><span class="edit-icon" title="Edit TTD">✎</span></span></div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="detail-meta-present detail-meta--present" id="detail-meta-present" ${savedMetaMode === 'edit' ? 'hidden' : ''}>${presentationSummary}</div>
                             </div>
@@ -3457,7 +3448,11 @@
                                             if (field === 'End Date') {
                                                 const hasDate = newValue && newValue.trim() && newValue.toLowerCase() !== 'n/a';
                                                 item['Action Status'] = hasDate ? 'Closed' : 'Open';
-                                                if (!hasDate) item['End Time'] = '';
+                                                if (!hasDate) item['Closure Time'] = '';
+                                            }
+                                            if (field === 'Resolution Date') {
+                                                const hasDate = newValue && newValue.trim() && newValue.toLowerCase() !== 'n/a';
+                                                if (!hasDate) item['Resolution Time'] = '';
                                             }
 
                                             updateDetailsUI();
@@ -3477,7 +3472,7 @@
                                         if (newValue !== currentValue || nowClicked) {
                                             item[field] = newValue;
 
-                                            if (field === 'End Time' && nowClicked) {
+                                            if (field === 'Closure Time' && nowClicked) {
                                                 const currentEndDate = item['End Date'];
                                                 if (!currentEndDate || currentEndDate === 'N/A' || currentEndDate === '') {
                                                     item['End Date'] = new Date().toISOString().split('T')[0];
@@ -3541,7 +3536,7 @@
                         item,
                         statusField: 'Action Status',
                         endDateField: 'End Date',
-                        endTimeField: 'End Time',
+                        endTimeField: 'Closure Time',
                         closureDateSpanId: 'detail-closure-date',
                         endTimeSpanId: 'detail-end-time'
                     });
@@ -3561,7 +3556,7 @@
                         closeConfig: {
                             statusField: 'Action Status',
                             endDateField: 'End Date',
-                            endTimeField: 'End Time',
+                            endTimeField: 'Closure Time',
                             remarkCloseMessage: 'Are you sure you want to add this remark and mark the action as Closed?',
                             actionCompleteMessage: 'Are you sure you want to add this action and mark the incident as Closed?'
                         },

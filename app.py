@@ -25,7 +25,8 @@ COLUMNS = [
     "Action No.", "ITSM Ticket", "Section Head", "System", "Category", 
     "Action Tracker ( Weekly Crisis Meeting)", "Crisis/Incident", 
     "Description", "Action Status", "Owner", "Action Start Date", 
-    "Start Time", "Target Date", "Remarks", "Actions", "End Date", "End Time", 
+    "Start Time", "Target Date", "Resolution Date", "Resolution Time",
+    "Remarks", "Actions", "End Date", "Closure Time", 
     # "Aging", 
     # "Number of postponed dates", 
     "Target Date last update", 
@@ -49,10 +50,12 @@ CSV_TO_DB = {
     "Action Start Date": "action_start_date",
     "Start Time": "start_time",
     "Target Date": "target_date",
+    "Resolution Date": "resolution_date",
+    "Resolution Time": "resolution_time",
     "Remarks": "remarks",
     "Actions": "actions_field",
     "End Date": "end_date",
-    "End Time": "end_time",
+    "Closure Time": "end_time",
     "Target Date last update": "target_date_last_update",
     "Crossed Target Date": "crossed_target_date",
     "Activity Status": "activity_status",
@@ -315,6 +318,13 @@ def run_schema_migrations(conn):
             cursor.execute("ALTER TABLE items ADD COLUMN time_to_recover TEXT")
             cursor.execute("ALTER TABLE items ADD COLUMN time_to_detect TEXT")
 
+        try:
+            cursor.execute("SELECT resolution_date FROM items LIMIT 1")
+        except sqlite3.OperationalError:
+            print("Migrating database: Adding Resolution Date and Resolution Time columns...")
+            cursor.execute("ALTER TABLE items ADD COLUMN resolution_date TEXT")
+            cursor.execute("ALTER TABLE items ADD COLUMN resolution_time TEXT")
+
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='misc_tasks'")
     if cursor.fetchone():
         cursor.execute("PRAGMA table_info(misc_tasks)")
@@ -448,9 +458,9 @@ def normalize_date(date_str):
     return date_str
 
 
-DATE_FIELDS = {"action_start_date", "target_date", "target_date_last_update"}
+DATE_FIELDS = {"action_start_date", "target_date", "target_date_last_update", "resolution_date"}
 
-TIME_FIELDS = {"start_time", "end_time"}
+TIME_FIELDS = {"start_time", "end_time", "resolution_time"}
 
 
 def get_db_connection():
@@ -491,11 +501,11 @@ def row_to_dict(item_row, week_status_row=None):
     if week_status_row:
         item["Action Status"] = week_status_row["action_status"] if week_status_row["action_status"] else ""
         item["End Date"] = week_status_row["end_date"] if week_status_row["end_date"] else ""
-        item["End Time"] = week_status_row["end_time"] if week_status_row["end_time"] else ""
+        item["Closure Time"] = week_status_row["end_time"] if week_status_row["end_time"] else ""
     else:
         item["Action Status"] = ""
         item["End Date"] = ""
-        item["End Time"] = ""
+        item["Closure Time"] = ""
     
     return item
 
@@ -517,7 +527,7 @@ def item_dict_to_db_values(item, data_type):
     return tuple(values)
 
 
-ITEM_WEEK_STATUS_CSV = {"Action Status", "End Date", "End Time"}
+ITEM_WEEK_STATUS_CSV = {"Action Status", "End Date", "Closure Time"}
 MISC_WEEK_STATUS_CSV = {"Status", "Completed Date", "Completed Time"}
 
 
@@ -1274,7 +1284,7 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                         """, (item_id, year, week,
                               row.get("Action Status", ""),
                               normalize_date(row.get("End Date", "")),
-                              row.get("End Time", "")))
+                              row.get("Closure Time", "")))
                         
                         new_count += 1
                     else:
@@ -1321,8 +1331,8 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                                     db_end_date = str(existing_status["end_date"] or "").strip()
                                     if csv_end_date != db_end_date:
                                         changed = True
-                                if not changed and "End Time" in present_columns:
-                                    csv_end_time = str(row.get("End Time", "")).strip()
+                                if not changed and "Closure Time" in present_columns:
+                                    csv_end_time = str(row.get("Closure Time", "")).strip()
                                     db_end_time = str(existing_status["end_time"] or "").strip()
                                     if csv_end_time != db_end_time:
                                         changed = True
@@ -1363,7 +1373,7 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                                 end_date = normalize_date(row.get("End Date", "")) if "End Date" in present_columns else (
                                     existing_status["end_date"] if existing_status else ""
                                 )
-                                end_time = row.get("End Time", "") if "End Time" in present_columns else (
+                                end_time = row.get("Closure Time", "") if "Closure Time" in present_columns else (
                                     existing_status["end_time"] if existing_status else ""
                                 )
                                 cursor.execute("""
@@ -1502,7 +1512,7 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                                 
                                 # Insert week status (use INSERT OR REPLACE to handle duplicates)
                                 # Normalize time fields to 24-hour format
-                                normalized_end_time = normalize_time_to_24h(action.get("End Time", ""))
+                                normalized_end_time = normalize_time_to_24h(action.get("Closure Time", ""))
                                 cursor.execute("""
                                     INSERT OR REPLACE INTO week_status (action_id, year, week, action_status, end_date, end_time)
                                     VALUES (?, ?, ?, ?, ?, ?)
@@ -2183,7 +2193,7 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                         item_id = cursor.lastrowid
                     
                     # Insert week status with normalized time
-                    normalized_end_time = normalize_time_to_24h(item.get("End Time", ""))
+                    normalized_end_time = normalize_time_to_24h(item.get("Closure Time", ""))
                     cursor.execute("""
                         INSERT OR REPLACE INTO week_status (action_id, year, week, action_status, end_date, end_time)
                         VALUES (?, ?, ?, ?, ?, ?)
@@ -2248,7 +2258,7 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                     db_status = str(existing_status["action_status"] or "").strip()
                     new_end_date = str(new_item.get("End Date", "")).strip()
                     db_end_date = str(existing_status["end_date"] or "").strip()
-                    new_end_time = str(new_item.get("End Time", "")).strip()
+                    new_end_time = str(new_item.get("Closure Time", "")).strip()
                     db_end_time = str(existing_status["end_time"] or "").strip()
 
                     if (new_status != db_status or
@@ -2275,7 +2285,7 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                 )
                 
                 # Insert or update week status with normalized time
-                normalized_end_time = normalize_time_to_24h(new_item.get("End Time", ""))
+                normalized_end_time = normalize_time_to_24h(new_item.get("Closure Time", ""))
                 cursor.execute("""
                     INSERT OR REPLACE INTO week_status (action_id, year, week, action_status, end_date, end_time)
                     VALUES (?, ?, ?, ?, ?, ?)
@@ -2310,7 +2320,7 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
             item_id = cursor.lastrowid
 
             # Insert or update week status with normalized time
-            normalized_end_time = normalize_time_to_24h(new_item.get("End Time", ""))
+            normalized_end_time = normalize_time_to_24h(new_item.get("Closure Time", ""))
             cursor.execute("""
                 INSERT OR REPLACE INTO week_status (action_id, year, week, action_status, end_date, end_time)
                 VALUES (?, ?, ?, ?, ?, ?)
