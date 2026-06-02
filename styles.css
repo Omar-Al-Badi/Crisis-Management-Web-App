@@ -1165,10 +1165,14 @@ input:checked + .slider:before {
 .detail-meta.detail-meta--edit {
     display: block;
     flex-wrap: unset;
-    background: var(--hover-bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.5rem;
+    width: 100%;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    background: transparent;
+    padding: 0.6rem 0;
+    position: relative;
+    margin-top: 0.25rem;
 }
 
 .detail-meta-grid {
@@ -1179,19 +1183,42 @@ input:checked + .slider:before {
     width: 100%;
 }
 
-.detail-meta-col {
-    display: flex;
-    flex-direction: column;
+.detail-meta--edit .detail-meta-grid {
+    grid-template-columns: repeat(4, minmax(min-content, 1fr));
+}
+
+.detail-meta--edit .detail-meta-col,
+.detail-meta-present,
+.description-box {
     border-radius: 6px;
     overflow: hidden;
     border: 1px solid var(--border);
     border-left-width: 4px;
-    border-left-color: var(--warning);
-    background: rgba(245, 158, 11, 0.05);
+    border-left-color: var(--secondary);
+    background: var(--card-bg);
 }
 
-[data-theme="dark"] .detail-meta-col {
-    background: rgba(245, 158, 11, 0.1);
+.detail-meta--edit .detail-meta-col {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.detail-meta-present,
+.description-box {
+    padding: 0.35rem 0.5rem;
+    margin-top: 0.25rem;
+}
+
+.description-box {
+    position: relative;
+}
+
+[data-theme="dark"] .detail-meta--edit .detail-meta-col,
+[data-theme="dark"] .detail-meta-present,
+[data-theme="dark"] .description-box {
+    border-left-color: var(--gray);
+    background: rgba(255, 255, 255, 0.04);
 }
 
 .detail-meta-row {
@@ -1199,6 +1226,10 @@ input:checked + .slider:before {
     border-bottom: 1px solid var(--border);
     font-size: inherit;
     line-height: 1.4;
+}
+
+.detail-meta--edit .detail-meta-row {
+    white-space: nowrap;
 }
 
 .detail-meta-row:last-child {
@@ -1219,25 +1250,17 @@ input:checked + .slider:before {
     transform: scaleX(-1) scale(1.2);
 }
 
-@media (max-width: 640px) {
-    .detail-meta-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
-
-@media (max-width: 420px) {
-    .detail-meta-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
 .detail-meta-present strong {
     color: var(--text);
     font-weight: 700;
 }
 
 .detail-meta-present .editable-value:hover {
-    border-bottom-color: var(--warning);
+    border-bottom-color: var(--secondary);
+}
+
+[data-theme="dark"] .detail-meta-present .editable-value:hover {
+    border-bottom-color: var(--gray);
 }
 
 .edit-icon {
@@ -1451,6 +1474,10 @@ input:checked + .slider:before {
     gap: 0.3rem 0.5rem;
 }
 
+.modal-content .detail-meta--edit .detail-meta-row {
+    padding: 0.25rem 0.45rem;
+}
+
 .modal-content .detail-label {
     font-size: 0.8rem;
 }
@@ -1562,18 +1589,29 @@ input:checked + .slider:before {
     padding-right: 9rem;
 }
 
+.modal-content .description-box,
 .modal-content .remark-entry {
-    padding: 0.4rem 0.5rem 0.4rem 1rem;
+    padding: 0.35rem 0.5rem;
 }
 
 .modal-content .remark-entry:has(.remark-items) {
-    padding-top: 0.4rem;
+    padding-top: 0.35rem;
     padding-right: 8rem;
+    padding-left: 0.5rem;
+    padding-bottom: 0.35rem;
 }
 
-.modal-content .description-box,
+.modal-content .description-box {
+    margin-top: 0.15rem;
+    margin-bottom: 0.35rem;
+}
+
+.modal-content .detail-meta.detail-meta--edit {
+    padding: 0.4rem 0;
+}
+
 .modal-content .detail-meta-present {
-    padding: 0.4rem 0.5rem 0.4rem 1rem;
+    padding: 0.35rem 0.5rem;
     margin-top: 0.15rem;
     margin-bottom: 0.35rem;
 }
@@ -1980,30 +2018,22 @@ input:checked + .slider:before {
     white-space: pre-wrap;
 }
 
-.description-box,
-.detail-meta-present {
-    background: rgba(245, 158, 11, 0.05);
-    padding: 0.6rem 0.75rem 0.6rem 1rem;
-    border-radius: 8px;
-    border-left: 4px solid var(--warning);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    position: relative;
-    margin-top: 0.25rem;
-}
-
-[data-theme="dark"] .description-box,
-[data-theme="dark"] .detail-meta-present {
-    background: rgba(245, 158, 11, 0.1);
+.description-box .remark-text {
+    color: var(--text-muted);
 }
 
 .description-box .edit-icon {
     position: absolute;
-    top: 0.5rem;
-    right: 0.75rem;
+    top: 0.35rem;
+    right: 0.5rem;
     opacity: 0;
     transition: var(--transition);
-    color: var(--warning);
+    color: var(--secondary);
     margin: 0;
+}
+
+[data-theme="dark"] .description-box .edit-icon {
+    color: var(--gray);
 }
 
 .description-box:hover .edit-icon {
@@ -2011,7 +2041,11 @@ input:checked + .slider:before {
 }
 
 .description-box .editable-value:hover {
-    border-bottom-color: var(--warning);
+    border-bottom-color: var(--secondary);
+}
+
+[data-theme="dark"] .description-box .editable-value:hover {
+    border-bottom-color: var(--gray);
 }
 
 .add-remark-form {

@@ -1457,6 +1457,64 @@
             return `${days}d`;
         }
 
+        function calculateIncidentAgeDisplay(item) {
+            const startDateRaw = item['Action Start Date'];
+            const startTimeRaw = item['Start Time'];
+
+            if (!startDateRaw || startDateRaw === 'N/A') return null;
+
+            let start, end;
+            const isClosed = isItemClosed(item);
+
+            start = parseDateUniversal(startDateRaw);
+            if (start && !isNaN(start.getTime())) {
+                let hh = 0, mm = 0;
+                if (startTimeRaw && startTimeRaw.includes(' ')) {
+                    const [timePart, ampm] = startTimeRaw.split(' ');
+                    [hh, mm] = timePart.split(':').map(Number);
+                    if (ampm === 'PM' && hh < 12) hh += 12;
+                    if (ampm === 'AM' && hh === 12) hh = 0;
+                } else {
+                    [hh, mm] = (startTimeRaw || '00:00').split(':').map(Number);
+                }
+                start.setHours(hh || 0, mm || 0, 0, 0);
+            }
+
+            if (isClosed) {
+                const endDateRaw = item['End Date'];
+                const endTimeRaw = item['Closure Time'];
+                end = parseDateUniversal(endDateRaw);
+                if (end && !isNaN(end.getTime())) {
+                    let hh = 0, mm = 0;
+                    if (endTimeRaw && endTimeRaw.includes(' ')) {
+                        const [timePart, ampm] = endTimeRaw.split(' ');
+                        [hh, mm] = timePart.split(':').map(Number);
+                        if (ampm === 'PM' && hh < 12) hh += 12;
+                        if (ampm === 'AM' && hh === 12) hh = 0;
+                    } else {
+                        [hh, mm] = (endTimeRaw || '00:00').split(':').map(Number);
+                    }
+                    end.setHours(hh || 0, mm || 0, 0, 0);
+                }
+            } else {
+                end = new Date();
+            }
+
+            if (!start || isNaN(start.getTime()) || !end || isNaN(end.getTime())) return null;
+
+            const diffMs = end - start;
+            const diffMins = Math.floor(diffMs / (1000 * 60));
+
+            if (diffMins < 0) return '0';
+            if (diffMins < 1440) {
+                const hh = Math.floor(diffMins / 60);
+                const mm = diffMins % 60;
+                return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+            }
+            const days = Math.floor(diffMins / 1440);
+            return `${days}d`;
+        }
+
         function formatDateForDisplay(dateStr) {
                 if (!dateStr || dateStr === 'N/A') return 'N/A';
                 const date = parseDateUniversal(dateStr);
@@ -1916,7 +1974,10 @@
                 } else if (closed) {
                     statusPhrase = 'closed';
                 } else {
-                    statusPhrase = 'still open';
+                    const ageDisplay = calculateIncidentAgeDisplay(item);
+                    statusPhrase = ageDisplay && ageDisplay !== '0'
+                        ? `still open, and has been for ${ageDisplay}`
+                        : 'still open';
                 }
 
                 const lifecyclePhrase = resolutionPhrase
@@ -1928,7 +1989,9 @@
                     ? ` and owned by ${presentationVar('Owner', owner)}`
                     : '';
 
-                return `The ${presentationVar('Crisis/Incident', title)} that occurred on ${presentationVar('Action Start Date', startDate, 'data-is-date="true"')}, at ${presentationVar('Start Time', startTime, 'data-is-time="true"')} which is ${lifecyclePhrase}${ownerSuffix}.`;
+                const linkVerb = closed ? 'which was' : 'which is';
+
+                return `The ${presentationVar('Crisis/Incident', title)} that occurred on ${presentationVar('Action Start Date', startDate, 'data-is-date="true"')}, at ${presentationVar('Start Time', startTime, 'data-is-time="true"')} ${linkVerb} ${lifecyclePhrase}${ownerSuffix}.`;
             }
 
             function attachDetailMetaModeHandlers(container, defaultMode) {
@@ -2864,68 +2927,8 @@
                     const agingClass = agingNum > 7 ? 'urgent' : (agingNum > 0 ? 'warning' : '');
 
                     const endDate = item['End Date'] && item['End Date'].trim() ? item['End Date'] : 'N/A';
-                    
-                    // Calculate Age with Time precision
-                    let ageDisplay = '0';
-                    const startDateRaw = item['Action Start Date'];
-                    const startTimeRaw = item['Start Time'];
-                    
-                    if (startDateRaw && startDateRaw !== 'N/A') {
-                        let start, end;
-                        
-                        // Parse start date and time safely
-                        start = parseDateUniversal(startDateRaw);
-                        if (start && !isNaN(start.getTime())) {
-                            // Handle both 24h and AM/PM formats
-                            let hh = 0, mm = 0;
-                            if (startTimeRaw && startTimeRaw.includes(' ')) {
-                                const [timePart, ampm] = startTimeRaw.split(' ');
-                                [hh, mm] = timePart.split(':').map(Number);
-                                if (ampm === 'PM' && hh < 12) hh += 12;
-                                if (ampm === 'AM' && hh === 12) hh = 0;
-                            } else {
-                                [hh, mm] = (startTimeRaw || '00:00').split(':').map(Number);
-                            }
-                            start.setHours(hh || 0, mm || 0, 0, 0);
-                        }
 
-                        // Parse end date and time safely
-                        if (isClosed) {
-                            const endDateRaw = item['End Date'];
-                            const endTimeRaw = item['Closure Time'];
-                            end = parseDateUniversal(endDateRaw);
-                            if (end && !isNaN(end.getTime())) {
-                                let hh = 0, mm = 0;
-                                if (endTimeRaw && endTimeRaw.includes(' ')) {
-                                    const [timePart, ampm] = endTimeRaw.split(' ');
-                                    [hh, mm] = timePart.split(':').map(Number);
-                                    if (ampm === 'PM' && hh < 12) hh += 12;
-                                    if (ampm === 'AM' && hh === 12) hh = 0;
-                                } else {
-                                    [hh, mm] = (endTimeRaw || '00:00').split(':').map(Number);
-                                }
-                                end.setHours(hh || 0, mm || 0, 0, 0);
-                            }
-                        } else {
-                            end = new Date();
-                        }
-                        
-                        if (start && !isNaN(start.getTime()) && end && !isNaN(end.getTime())) {
-                            const diffMs = end - start;
-                            const diffMins = Math.floor(diffMs / (1000 * 60));
-                            
-                            if (diffMins < 0) {
-                                ageDisplay = '0';
-                            } else if (diffMins < 1440) { // Less than 24 hours
-                                const hh = Math.floor(diffMins / 60);
-                                const mm = diffMins % 60;
-                                ageDisplay = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
-                            } else {
-                                const days = Math.floor(diffMins / 1440);
-                                ageDisplay = `${days}d`;
-                            }
-                        }
-                    }
+                    const ageDisplay = calculateIncidentAgeDisplay(item) || '0';
                     item['Age'] = ageDisplay;
 
                     // Reference info
