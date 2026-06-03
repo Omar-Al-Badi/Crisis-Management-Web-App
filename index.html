@@ -419,6 +419,40 @@
         </div>
     </div>
 
+    <!-- Edit Remark / Action Modal -->
+    <div id="edit-remark-action-modal" class="modal" style="z-index: 2000;">
+        <div class="modal-content edit-remark-action-content" style="max-width: 520px; margin-top: 12vh;">
+            <div class="modal-header">
+                <h3 id="edit-ra-title">Edit</h3>
+                <span class="close-modal" id="close-edit-ra-modal">&times;</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="edit-ra-text">Text</label>
+                <textarea id="edit-ra-text" class="form-control" style="min-height: 100px;"></textarea>
+            </div>
+            <div class="form-row edit-ra-form-row">
+                <div class="form-group">
+                    <label class="form-label" for="edit-ra-date-display">Date</label>
+                    <div style="position: relative;">
+                        <input type="text" id="edit-ra-date-display" class="form-control" placeholder="dd/mm/yyyy">
+                        <input type="date" id="edit-ra-date-hidden" style="position: absolute; top: 0; left: 0; opacity: 0; width: 100%; height: 100%; pointer-events: none;">
+                    </div>
+                </div>
+                <div class="form-group" id="edit-ra-assignee-group">
+                    <label class="form-label" for="edit-ra-assignee">Assigned To</label>
+                    <input type="text" id="edit-ra-assignee" class="form-control" placeholder="Assignee name">
+                </div>
+            </div>
+            <div class="form-group" id="edit-ra-vendor-group" style="display: none;">
+                <label class="form-label" for="edit-ra-vendor">Vendor Ticket</label>
+                <input type="text" id="edit-ra-vendor" class="form-control" placeholder="Optional">
+            </div>
+            <div class="form-actions" style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary" id="cancel-edit-ra-modal">Cancel</button>
+                <button type="button" id="edit-ra-save" class="btn btn-primary">Save Changes</button>
+            </div>
+        </div>
+    </div>
     <!-- Export Options Modal -->
     <div id="export-options-modal" class="modal" style="z-index: 3000;">
         <div class="modal-content" style="max-width: 500px; margin-top: 20vh;">
@@ -549,6 +583,9 @@
         let currentSortOrder = 'asc'; // Default sort order
         const DEFAULT_MISC_VISIBLE_COLUMNS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
         let savedIncidentVisibleColumns = null;
+        let activeDashboardLoadId = 0;
+        let dashboardAbortController = null;
+        let dashboardLoading = false;
 
         function isMiscMode() {
             return currentDataType === 'Miscellaneous';
@@ -849,6 +886,13 @@
                 });
             });
 
+            function setAddFormSectionInputsEnabled(container, enabled) {
+                if (!container) return;
+                container.querySelectorAll('input, select, textarea').forEach(el => {
+                    el.disabled = !enabled;
+                });
+            }
+
             function updateTableForDataType() {
                 const thead = document.querySelector('thead tr');
                 const dropdown = document.getElementById('column-dropdown');
@@ -892,6 +936,8 @@
                     }
                     if (addIncidentFields) addIncidentFields.style.display = 'none';
                     if (addMiscFields) addMiscFields.style.display = 'block';
+                    setAddFormSectionInputsEnabled(addIncidentFields, false);
+                    setAddFormSectionInputsEnabled(addMiscFields, true);
                 } else {
                     if (savedIncidentVisibleColumns) {
                         visibleColumns = migrateIncidentVisibleColumns(savedIncidentVisibleColumns);
@@ -948,6 +994,8 @@
                     }
                     if (addIncidentFields) addIncidentFields.style.display = 'block';
                     if (addMiscFields) addMiscFields.style.display = 'none';
+                    setAddFormSectionInputsEnabled(addIncidentFields, true);
+                    setAddFormSectionInputsEnabled(addMiscFields, false);
                 }
                 applyColumnVisibility();
                 wireTableHeaderSorting();
@@ -1569,6 +1617,11 @@
                 loadDashboardData(isoDate || getWeekPickerDateStr());
             });
 
+            setupDualDatePicker(
+                document.getElementById('edit-ra-date-display'),
+                document.getElementById('edit-ra-date-hidden')
+            );
+
             // --- Type Selection Logic (after week picker exists) ---
             const typeRadios = document.querySelectorAll('input[name="data-type"]');
             typeRadios.forEach(radio => {
@@ -1695,6 +1748,14 @@
 
                 result.text = rest.trim();
                 return result;
+            }
+
+            function parseRemarkLine(raw) {
+                const dateMatch = raw.match(/^\[(\d{2}\/\d{2}\/\d{4})\]\s*([\s\S]*)/);
+                return {
+                    date: dateMatch ? dateMatch[1] : '',
+                    text: dateMatch ? dateMatch[2] : raw.trim()
+                };
             }
 
             function formatActionLine({ date, scope, assignee, vendorTicket, closed, text }) {
@@ -2079,14 +2140,15 @@
 
                             if (type === 'remark') {
                                 const oldRemark = state.remarksData[index];
-                                showEditModal({
+                                const remarkParsed = parseRemarkLine(oldRemark);
+                                showEditRemarkActionModal({
                                     title: 'Edit Remark',
-                                    label: 'Update your remark:',
-                                    initialValue: oldRemark,
-                                    type: 'textarea',
+                                    mode: 'remark',
+                                    initial: remarkParsed,
+                                    showVendorField: false,
                                     onSave: async (newRemark) => {
-                                        if (newRemark !== null && newRemark.trim() !== '' && newRemark !== oldRemark) {
-                                            state.remarksData[index] = newRemark.trim();
+                                        if (newRemark !== oldRemark) {
+                                            state.remarksData[index] = newRemark;
                                             state.syncToItem();
                                             onRefresh();
                                             await saveActionUpdate(item, null, true);
@@ -2094,17 +2156,17 @@
                                     }
                                 });
                             } else if (type === 'action') {
-                                const parsed = parseActionLine(state.actionsData[index]);
-                                const oldText = parsed.text;
-                                showEditModal({
+                                const oldLine = state.actionsData[index];
+                                const parsed = parseActionLine(oldLine);
+                                const showVendorField = showScopeTabs && parsed.scope === 'external';
+                                showEditRemarkActionModal({
                                     title: 'Edit Action',
-                                    label: 'Update your action:',
-                                    initialValue: oldText,
-                                    type: 'textarea',
-                                    onSave: async (newAction) => {
-                                        if (newAction !== null && newAction.trim() !== '' && newAction.trim() !== oldText) {
-                                            parsed.text = newAction.trim();
-                                            state.actionsData[index] = formatActionLine(parsed);
+                                    mode: 'action',
+                                    initial: parsed,
+                                    showVendorField,
+                                    onSave: async (newLine) => {
+                                        if (newLine !== oldLine) {
+                                            state.actionsData[index] = newLine;
                                             state.syncToItem();
                                             onRefresh();
                                             await saveActionUpdate(item, null, true);
@@ -2425,7 +2487,72 @@
                 }
             }
 
+            function isActiveDashboardLoad(loadId, requestDataType) {
+                return loadId === activeDashboardLoadId && requestDataType === currentDataType;
+            }
+
+            function showDashboardLoadingState() {
+                dashboardLoading = true;
+                currentItems = [];
+                displayItems = [];
+                const tbody = document.querySelector('tbody');
+                const colSpan = 1 + (visibleColumns && visibleColumns.length ? visibleColumns.length : 9);
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center; padding: 2rem; color: var(--text-muted);">Loading…</td></tr>`;
+                }
+                const totalEl = document.querySelector('#stat-total .stat-value');
+                const openEl = document.querySelector('.stat-card.open .stat-value');
+                const closedEl = document.querySelector('.stat-card.closed .stat-value');
+                if (totalEl) totalEl.textContent = '—';
+                if (openEl) openEl.textContent = '—';
+                if (closedEl) closedEl.textContent = '—';
+                if (emptyWeekHint) emptyWeekHint.style.display = 'none';
+            }
+
+            function applyDashboardData(data) {
+                if (dbInitBanner) {
+                    dbInitBanner.style.display = data.db_initialized === false ? 'block' : 'none';
+                }
+                lastSyncedTime = data.last_modified;
+                currentItems = data.items || [];
+                dashboardLoading = false;
+                updateDashboardUI(currentItems);
+
+                if (emptyWeekHint) {
+                    const showHint = data.db_initialized !== false &&
+                        window.currentTimePeriod === 'Week' &&
+                        (currentItems.length === 0);
+                    emptyWeekHint.style.display = showHint ? 'block' : 'none';
+                }
+
+                const activeItemId = document.querySelector('.detail-title h3')?.getAttribute('data-id')
+                    || document.querySelector('.detail-title-row h3')?.getAttribute('data-id');
+                if (activeItemId) {
+                    const updatedItem = currentItems.find(a => getItemNo(a) === activeItemId);
+                    const remarkItemText = document.getElementById('new-remark-action-text');
+                    if (updatedItem && (!remarkItemText || !remarkItemText.value.trim())) {
+                        showIncidentDetails(updatedItem);
+                    }
+                }
+            }
+
             async function loadDashboardData(dateStr, silent = false) {
+                const requestDataType = currentDataType;
+                const loadId = silent ? activeDashboardLoadId : ++activeDashboardLoadId;
+
+                let fetchSignal;
+                if (!silent) {
+                    if (dashboardAbortController) {
+                        dashboardAbortController.abort();
+                    }
+                    dashboardAbortController = new AbortController();
+                    fetchSignal = dashboardAbortController.signal;
+                    showDashboardLoadingState();
+                } else if (dashboardLoading) {
+                    // Do not let background polls skip updates while a tab/week load is in progress
+                    return;
+                }
+
                 let effectiveDateStr = dateStr && String(dateStr).trim() ? dateStr : getTodayISO();
                 let date = null;
 
@@ -2448,13 +2575,17 @@
                     }
 
                     allIncidentsAndCrises = [];
-                    if (currentDataType === 'Action') {
+                    const weekParam = window.currentTimePeriod === 'Year' ? 'all' : currentWeek;
+                    const fetchOpts = fetchSignal ? { signal: fetchSignal } : {};
+                    if (requestDataType === 'Action') {
                         const [incRes, criRes] = await Promise.all([
-                            fetch(`/api/data?year=${currentYear}&week=${window.currentTimePeriod === 'Year' ? 'all' : currentWeek}&type=Incident`),
-                            fetch(`/api/data?year=${currentYear}&week=${window.currentTimePeriod === 'Year' ? 'all' : currentWeek}&type=Crisis`)
+                            fetch(`/api/data?year=${currentYear}&week=${weekParam}&type=Incident`, fetchOpts),
+                            fetch(`/api/data?year=${currentYear}&week=${weekParam}&type=Crisis`, fetchOpts)
                         ]);
+                        if (!isActiveDashboardLoad(loadId, requestDataType)) return;
                         if (incRes.ok && criRes.ok) {
                             const [incData, criData] = await Promise.all([incRes.json(), criRes.json()]);
+                            if (!isActiveDashboardLoad(loadId, requestDataType)) return;
                             allIncidentsAndCrises = [
                                 ...(incData.items || []).map(a => ({ ...a, type: 'Incident' })),
                                 ...(criData.items || []).map(a => ({ ...a, type: 'Crisis' }))
@@ -2463,54 +2594,67 @@
                         }
                     }
 
-                    const response = await fetch(`/api/data?year=${currentYear}&week=${window.currentTimePeriod === 'Year' ? 'all' : currentWeek}&type=${currentDataType}`);
+                    const response = await fetch(
+                        `/api/data?year=${currentYear}&week=${weekParam}&type=${encodeURIComponent(requestDataType)}`,
+                        fetchOpts
+                    );
+                    if (!isActiveDashboardLoad(loadId, requestDataType)) return;
                     if (!response.ok) {
+                        if (!silent && isActiveDashboardLoad(loadId, requestDataType)) {
+                            dashboardLoading = false;
+                            currentItems = [];
+                            updateDashboardUI([]);
+                        }
                         setReportingPeriodLabel(date, 'Unable to load data — check that the server is running');
                         return;
                     }
 
                     const data = await response.json();
+                    if (!isActiveDashboardLoad(loadId, requestDataType)) return;
+                    if (data.data_type && data.data_type !== requestDataType) {
+                        if (!silent && dashboardLoading) {
+                            dashboardLoading = false;
+                            currentItems = [];
+                            updateDashboardUI([]);
+                        }
+                        return;
+                    }
                     setReportingPeriodLabel(date, null);
 
                     try {
-                        if (dbInitBanner) {
-                            dbInitBanner.style.display = data.db_initialized === false ? 'block' : 'none';
-                        }
-
-                        if (data.last_modified > lastSyncedTime || !silent) {
-                            lastSyncedTime = data.last_modified;
-                            currentItems = data.items || [];
-                            updateDashboardUI(currentItems);
-
-                            if (emptyWeekHint) {
-                                const showHint = data.db_initialized !== false &&
-                                    window.currentTimePeriod === 'Week' &&
-                                    (currentItems.length === 0);
-                                emptyWeekHint.style.display = showHint ? 'block' : 'none';
-                            }
-
-                            const activeItemId = document.querySelector('.detail-title h3')?.getAttribute('data-id')
-                                || document.querySelector('.detail-title-row h3')?.getAttribute('data-id');
-                            if (activeItemId) {
-                                const updatedItem = currentItems.find(a => getItemNo(a) === activeItemId);
-                                const remarkItemText = document.getElementById('new-remark-action-text');
-                                if (updatedItem && (!remarkItemText || !remarkItemText.value.trim())) {
-                                    showIncidentDetails(updatedItem);
-                                }
-                            }
+                        const shouldApply = data.last_modified > lastSyncedTime || !silent;
+                        if (shouldApply && isActiveDashboardLoad(loadId, requestDataType)) {
+                            applyDashboardData(data);
                         }
                     } catch (renderError) {
                         console.error('Error rendering dashboard data:', renderError);
+                        if (!silent && isActiveDashboardLoad(loadId, requestDataType)) {
+                            dashboardLoading = false;
+                            currentItems = [];
+                            updateDashboardUI([]);
+                        }
                         if (emptyWeekHint) {
                             emptyWeekHint.textContent = `Data loaded, but the table could not render: ${renderError.message}`;
                             emptyWeekHint.style.display = 'block';
                         }
                     }
                 } catch (error) {
+                    if (error && error.name === 'AbortError') return;
                     console.error('Error fetching dashboard data:', error);
+                    if (!isActiveDashboardLoad(loadId, requestDataType)) return;
+                    if (!silent && isActiveDashboardLoad(loadId, requestDataType)) {
+                        dashboardLoading = false;
+                        currentItems = [];
+                        updateDashboardUI([]);
+                    }
                     const fallbackDate = date && !isNaN(date.getTime()) ? date : new Date();
                     setReportingPeriodLabel(fallbackDate, 'Unable to load data — check that the server is running');
                 } finally {
+                    if (!silent && dashboardLoading && isActiveDashboardLoad(loadId, requestDataType)) {
+                        dashboardLoading = false;
+                        updateDashboardUI(currentItems);
+                    }
+                    if (!isActiveDashboardLoad(loadId, requestDataType)) return;
                     if (!reportingPeriod) return;
                     if (reportingPeriod.textContent.includes('Loading')) {
                         setReportingPeriodLabel(new Date(), 'Unable to load data — check that the server is running');
@@ -2539,6 +2683,103 @@
                     option.textContent = `[${type}] ${id}: ${title.substring(0, 50)}${title.length > 50 ? '...' : ''}`;
                     select.appendChild(option);
                 });
+            }
+
+            function isoDateToDMY(isoDate) {
+                if (!isoDate) return '';
+                const dateParts = isoDate.split('-');
+                return `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+            }
+
+            // --- Edit Remark / Action Modal Helper ---
+            function showEditRemarkActionModal({ title, mode, initial, showVendorField, onSave }) {
+                const modal = document.getElementById('edit-remark-action-modal');
+                const titleEl = document.getElementById('edit-ra-title');
+                const textEl = document.getElementById('edit-ra-text');
+                const dateDisplayEl = document.getElementById('edit-ra-date-display');
+                const dateHiddenEl = document.getElementById('edit-ra-date-hidden');
+                const assigneeGroup = document.getElementById('edit-ra-assignee-group');
+                const assigneeEl = document.getElementById('edit-ra-assignee');
+                const vendorGroup = document.getElementById('edit-ra-vendor-group');
+                const vendorEl = document.getElementById('edit-ra-vendor');
+                const saveBtn = document.getElementById('edit-ra-save');
+                const cancelBtn = document.getElementById('cancel-edit-ra-modal');
+                const closeBtn = document.getElementById('close-edit-ra-modal');
+
+                titleEl.textContent = title;
+                textEl.value = initial.text || '';
+
+                const defaultIso = getTodayISO();
+                const dateIso = initial.date ? dmyToISO(initial.date) : defaultIso;
+                dateHiddenEl.value = dateIso || defaultIso;
+                dateDisplayEl.value = isoToDMY(dateHiddenEl.value);
+
+                const isAction = mode === 'action';
+                assigneeGroup.style.display = isAction ? 'flex' : 'none';
+                assigneeEl.value = isAction ? (initial.assignee || '') : '';
+
+                vendorGroup.style.display = isAction && showVendorField ? 'flex' : 'none';
+                vendorEl.value = isAction && showVendorField ? (initial.vendorTicket || '') : '';
+
+                const closeModal = () => {
+                    modal.style.display = 'none';
+                    saveBtn.onclick = null;
+                };
+
+                saveBtn.onclick = async () => {
+                    const text = textEl.value.trim();
+                    const isoDate = dateHiddenEl.value;
+                    const assignee = assigneeEl.value.trim();
+                    const vendorTicket = vendorEl.value.trim();
+
+                    if (!text) {
+                        await showNotificationModal({
+                            title: `Missing ${isAction ? 'Action' : 'Remark'}`,
+                            message: `Please enter ${isAction ? 'an action' : 'a remark'}.`
+                        });
+                        return;
+                    }
+
+                    if (isAction && !assignee) {
+                        await showNotificationModal({
+                            title: 'Missing Assignee',
+                            message: 'Please specify who this action is assigned to.'
+                        });
+                        return;
+                    }
+
+                    if (!isoDate) {
+                        await showNotificationModal({
+                            title: 'Missing Date',
+                            message: 'Please enter a valid date.'
+                        });
+                        return;
+                    }
+
+                    const formattedDate = isoDateToDMY(isoDate);
+                    let newLine;
+                    if (isAction) {
+                        newLine = formatActionLine({
+                            date: formattedDate,
+                            scope: initial.scope || 'internal',
+                            assignee,
+                            vendorTicket: showVendorField ? vendorTicket : '',
+                            closed: initial.closed || false,
+                            text
+                        });
+                    } else {
+                        newLine = `[${formattedDate}] ${text}`;
+                    }
+
+                    await onSave(newLine);
+                    closeModal();
+                };
+
+                cancelBtn.onclick = closeModal;
+                closeBtn.onclick = closeModal;
+
+                modal.style.display = 'block';
+                setTimeout(() => textEl.focus(), 100);
             }
 
             // --- Generic Edit Modal Helper ---

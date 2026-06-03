@@ -2443,3 +2443,16 @@ footer p {
     color: var(--primary-dark);
 }
 
+
+#edit-remark-action-modal .edit-ra-form-row {
+    align-items: flex-start;
+}
+
+#edit-remark-action-modal .edit-ra-form-row > .form-group {
+    flex: 1;
+    min-width: 0;
+}
+
+#edit-remark-action-modal #edit-ra-assignee-group {
+    flex-direction: column;
+}
