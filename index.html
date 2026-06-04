@@ -234,7 +234,7 @@
                 <div class="form-grid">
                     <div class="form-group">
                         <label class="form-label" for="new-action-no">Incident No.</label>
-                        <input type="text" id="new-action-no" class="form-control">
+                        <input type="text" id="new-action-no" class="form-control" readonly>
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="new-itsm-ticket">ITSM Ticket</label>
@@ -310,7 +310,7 @@
                     <div class="form-grid add-misc-form-row add-misc-form-row-1">
                         <div class="form-group">
                             <label class="form-label" for="new-misc-task-no">Task No.</label>
-                            <input type="text" id="new-misc-task-no" class="form-control">
+                            <input type="text" id="new-misc-task-no" class="form-control" readonly>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="new-misc-itsm-ticket">ITSM Ticket</label>
@@ -607,6 +607,54 @@
             return isMiscMode() ? 'Status' : 'Action Status';
         }
 
+        const ID_PREFIX_BY_TYPE = {
+            Incident: 'M',
+            Crisis: 'C',
+            Miscellaneous: 'T'
+        };
+
+        function getSingularLabel() {
+            if (currentDataType === 'Crisis') return 'Crisis';
+            if (currentDataType === 'Action') return 'Action Item';
+            if (currentDataType === 'Miscellaneous') return 'Task';
+            return 'Incident';
+        }
+
+        function parseSerialNumber(value, prefix) {
+            if (!value) return null;
+            const s = String(value).trim();
+            if (!s) return null;
+            const prefixed = new RegExp(`^${prefix}(\\d+)$`, 'i');
+            const m = s.match(prefixed);
+            if (m) return parseInt(m[1], 10);
+            if (/^\d+$/.test(s)) return parseInt(s, 10);
+            return null;
+        }
+
+        function nextIdFromItems(items, fieldName, prefix) {
+            const maxN = (items || []).reduce((max, a) => {
+                const n = parseSerialNumber(a[fieldName], prefix);
+                return n !== null && n > max ? n : max;
+            }, 0);
+            return `${prefix}${maxN + 1}`;
+        }
+
+        async function fetchNextId(dataType) {
+            const prefix = ID_PREFIX_BY_TYPE[dataType];
+            if (!prefix) return null;
+            const fieldName = dataType === 'Miscellaneous' ? 'Task No.' : 'Action No.';
+            try {
+                const res = await fetch(`/api/next-id?type=${encodeURIComponent(dataType)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.next_id) return data.next_id;
+                }
+            } catch (err) {
+                console.warn('fetchNextId failed, using local fallback:', err);
+            }
+            return nextIdFromItems(currentItems, fieldName, prefix);
+        }
+
         function isoToDMY(isoStr) {
             if (!isoStr) return '';
             const [year, month, day] = isoStr.split('-');
@@ -687,19 +735,16 @@
             }
 
             if (addActionBtn) {
-                addActionBtn.addEventListener('click', () => {
+                addActionBtn.addEventListener('click', async () => {
                     console.log('Add button clicked');
                     const now = new Date();
                     const todayISO = now.toISOString().split('T')[0];
                     const hh24 = String(now.getHours()).padStart(2, '0');
                     const mm = String(now.getMinutes()).padStart(2, '0');
+                    const nextId = await fetchNextId(currentDataType);
 
                     if (isMiscMode()) {
-                        const maxId = (currentItems || []).reduce((max, a) => {
-                            const id = parseInt(a['Task No.']);
-                            return !isNaN(id) && id > max ? id : max;
-                        }, 0);
-                        if (newMiscTaskNoInput) newMiscTaskNoInput.value = maxId + 1;
+                        if (newMiscTaskNoInput && nextId) newMiscTaskNoInput.value = nextId;
                         if (newMiscCreatedDateHidden) newMiscCreatedDateHidden.value = todayISO;
                         if (newMiscCreatedDateDisplay) newMiscCreatedDateDisplay.value = isoToDMY(todayISO);
                         const miscTimeEl = document.getElementById('new-misc-created-time');
@@ -712,13 +757,8 @@
                         return;
                     }
 
-                    // Auto-generate Action ID
-                    const maxId = (currentItems || []).reduce((max, a) => {
-                        const id = parseInt(a['Action No.']);
-                        return !isNaN(id) && id > max ? id : max;
-                    }, 0);
-                    if (newActionNoInput) newActionNoInput.value = maxId + 1;
-                    
+                    if (newActionNoInput && nextId) newActionNoInput.value = nextId;
+
                     // Set default start date and time to now
                     if (newStartDateHidden) newStartDateHidden.value = todayISO;
                     if (newStartDateDisplay) newStartDateDisplay.value = isoToDMY(todayISO);
@@ -727,7 +767,7 @@
                         // For <input type="time">, we still need 24h format HH:mm
                         startTimeEl.value = `${hh24}:${mm}`;
                     }
-                    
+
                     if (addActionModal) addActionModal.style.display = 'block';
                 });
             }
@@ -781,8 +821,9 @@
                     }
                     
                     const actionNo = newActionNoInput ? newActionNoInput.value.trim() : '';
+                    const singularLabel = getSingularLabel();
                     if (!actionNo) {
-                        showNotification('Error', 'Action Number is required.');
+                        showNotification('Error', `${singularLabel} No. is required.`);
                         return;
                     }
                     const itsmTicket = document.getElementById('new-itsm-ticket')?.value || '';
@@ -1574,6 +1615,16 @@
             }
 
             const formatVal = (val) => (!val || val === '0m' || val === 'N/A') ? 'N/A' : val;
+
+            function escapeAttr(str) {
+                return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+            }
+
+            function renderDescriptionCell(description) {
+                const text = description || 'N/A';
+                const titleAttr = description ? ` title="${escapeAttr(description)}"` : '';
+                return `<td class="cell-description"${titleAttr}><span class="cell-description-text">${text}</span></td>`;
+            }
 
             function setupDualDatePicker(displayId, hiddenId, onChange) {
                 const displayEl = typeof displayId === 'string' ? document.getElementById(displayId) : displayId;
@@ -3122,10 +3173,10 @@
                             : `<svg ${hideRowIconAttrs} class="hide-row-icon" title="Hide row"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
                         const completedDate = item['Completed Date'] && item['Completed Date'].trim() ? item['Completed Date'] : 'N/A';
                         tr.innerHTML = `
-                            <td style="text-align: center;">${hideRowIconHtml}</td>
+                            <td>${hideRowIconHtml}</td>
                             <td data-id="${itemNo}">${itemNo || 'N/A'}</td>
                             <td>${item['Title'] || 'N/A'}</td>
-                            <td>${item['Description'] || 'N/A'}</td>
+                            ${renderDescriptionCell(item['Description'])}
                             <td>${item['Assigned Team'] || 'N/A'}</td>
                             <td>${item['Assigned By'] || 'N/A'}</td>
                             <td><span class="status status-${statusClass}">${statusText}</span></td>
@@ -3192,13 +3243,11 @@
                         : `<svg ${hideRowIconAttrs} class="hide-row-icon" title="Hide row from view" aria-label="Hide row from view"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
 
                     tr.innerHTML = `
-                        <td style="text-align: center;">
-                            ${hideRowIconHtml}
-                        </td>
+                        <td>${hideRowIconHtml}</td>
                         <td data-id="${itemNo || ''}">${itemNo || 'N/A'}</td>
                         <td>${item['ITSM Ticket'] || 'N/A'}</td>
                         <td>${titleDisplay}</td>
-                        <td>${item['Description'] || 'N/A'}</td>
+                        ${renderDescriptionCell(item['Description'])}
                         <td>${item['System'] || 'N/A'}</td>
                         <td>${item['Owner'] || 'N/A'}</td>
                         <td><span class="status status-${statusClass}">${statusText}</span></td>

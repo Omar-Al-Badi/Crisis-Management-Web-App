@@ -4,6 +4,7 @@ import json
 import csv
 import os
 import io
+import re
 import sqlite3
 import urllib.parse
 from datetime import datetime, timedelta
@@ -740,6 +741,50 @@ def get_item_id(cursor, data_type, action_no):
     return row[0] if row else None
 
 
+ID_PREFIX = {
+    "Incident": "M",
+    "Crisis": "C",
+    "Miscellaneous": "T",
+}
+
+
+def parse_serial_number(value, prefix):
+    """Extract serial integer from prefixed ID (M3) or legacy plain numeric (3)."""
+    if not value:
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    m = re.match(rf"^{re.escape(prefix)}(\d+)$", s, re.IGNORECASE)
+    if m:
+        return int(m.group(1))
+    if re.match(r"^\d+$", s):
+        return int(s)
+    return None
+
+
+def get_next_prefixed_id(cursor, data_type):
+    """Return next auto-increment ID for Incident (M), Crisis (C), or Task (T)."""
+    prefix = ID_PREFIX.get(data_type)
+    if not prefix:
+        raise ValueError(f"Unknown data_type: {data_type}")
+    if data_type == "Miscellaneous":
+        cursor.execute("SELECT task_no FROM misc_tasks")
+        rows = [r[0] for r in cursor.fetchall()]
+    else:
+        cursor.execute(
+            "SELECT action_no FROM items WHERE data_type = ?",
+            (data_type,),
+        )
+        rows = [r[0] for r in cursor.fetchall()]
+    max_n = 0
+    for row in rows:
+        n = parse_serial_number(row, prefix)
+        if n is not None and n > max_n:
+            max_n = n
+    return f"{prefix}{max_n + 1}"
+
+
 def db_exists():
     """Check if the SQLite database exists and has been initialized."""
     if not os.path.exists(DB_PATH):
@@ -952,6 +997,8 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
         parsed_path = urllib.parse.urlparse(self.path)
         if parsed_path.path == "/api/data":
             self.handle_get_data(parsed_path.query)
+        elif parsed_path.path == "/api/next-id":
+            self.handle_get_next_id(parsed_path.query)
         elif parsed_path.path == "/api/export":
             self.handle_export(parsed_path.query)
         else:
@@ -971,6 +1018,31 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_migrate_schema()
         else:
             self.send_error(404)
+
+    def handle_get_next_id(self, query):
+        params = urllib.parse.parse_qs(query)
+        data_type = params.get("type", ["Incident"])[0]
+        if data_type not in ID_PREFIX:
+            self.send_response(400)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(
+                json.dumps({"error": f"Invalid type. Use one of: {', '.join(ID_PREFIX)}"}).encode()
+            )
+            return
+        if db_exists():
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            next_id = get_next_prefixed_id(cursor, data_type)
+            conn.close()
+        else:
+            next_id = f"{ID_PREFIX[data_type]}1"
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(
+            json.dumps({"next_id": next_id, "data_type": data_type}).encode()
+        )
 
     def handle_hide_row(self):
         content_length = int(self.headers['Content-Length'])

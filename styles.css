@@ -721,6 +721,26 @@ header .header-content.container {
     padding: 0.4rem 0.65rem;
 }
 
+.table-container th,
+.table-container td {
+    text-align: left;
+    vertical-align: middle;
+}
+
+.table-container td.cell-description {
+    max-width: 14rem;
+}
+
+.table-container .cell-description-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    word-break: break-word;
+    line-height: 1.35;
+}
+
 .table-container .status {
     font-size: 0.75rem;
 }
@@ -913,10 +933,6 @@ td {
     opacity: 1;
     color: var(--danger);
     transform: scale(1.1);
-}
-
-.age-column {
-    text-align: center;
 }
 
 .age-column.urgent {
