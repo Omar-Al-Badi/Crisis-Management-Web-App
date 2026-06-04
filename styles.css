@@ -727,11 +727,11 @@ header .header-content.container {
     vertical-align: middle;
 }
 
-.table-container td.cell-description {
+.table-container tbody td:not(.cell-no-clamp) {
     max-width: 14rem;
 }
 
-.table-container .cell-description-text {
+.table-container .cell-text {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
@@ -1199,10 +1199,6 @@ input:checked + .slider:before {
     width: 100%;
 }
 
-.detail-meta--edit .detail-meta-grid {
-    grid-template-columns: repeat(4, minmax(min-content, 1fr));
-}
-
 .detail-meta--edit .detail-meta-col,
 .detail-meta-present,
 .description-box {
@@ -1244,16 +1240,31 @@ input:checked + .slider:before {
     line-height: 1.4;
 }
 
-.detail-meta--edit .detail-meta-row {
-    white-space: nowrap;
-}
-
 .detail-meta-row:last-child {
     border-bottom: none;
 }
 
 .detail-meta-row > span {
     display: inline;
+}
+
+.detail-meta--edit .detail-meta-row > span {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 0.15rem;
+}
+
+.detail-meta--edit .detail-meta-row strong,
+.detail-meta--edit .detail-meta-row .edit-icon {
+    flex-shrink: 0;
+}
+
+.detail-meta--edit .detail-meta-row .editable-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* Match incident title / description edit pencils (scaleX flip needs inline-block) */

@@ -234,7 +234,7 @@
                 <div class="form-grid">
                     <div class="form-group">
                         <label class="form-label" for="new-action-no">Incident No.</label>
-                        <input type="text" id="new-action-no" class="form-control" readonly>
+                        <input type="text" id="new-action-no" class="form-control" autocomplete="off" title="Must be unique for this type">
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="new-itsm-ticket">ITSM Ticket</label>
@@ -310,7 +310,7 @@
                     <div class="form-grid add-misc-form-row add-misc-form-row-1">
                         <div class="form-group">
                             <label class="form-label" for="new-misc-task-no">Task No.</label>
-                            <input type="text" id="new-misc-task-no" class="form-control" readonly>
+                            <input type="text" id="new-misc-task-no" class="form-control" autocomplete="off" title="Must be unique">
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="new-misc-itsm-ticket">ITSM Ticket</label>
@@ -613,6 +613,15 @@
             Miscellaneous: 'T'
         };
 
+        function itemNoExistsInCurrentData(actionNo, dataType = currentDataType) {
+            const field = dataType === 'Miscellaneous' ? 'Task No.' : 'Action No.';
+            const normalized = String(actionNo || '').trim().toLowerCase();
+            if (!normalized) return false;
+            return (currentItems || []).some(
+                (item) => String(item[field] || '').trim().toLowerCase() === normalized
+            );
+        }
+
         function getSingularLabel() {
             if (currentDataType === 'Crisis') return 'Crisis';
             if (currentDataType === 'Action') return 'Action Item';
@@ -734,6 +743,25 @@
                 if (savedName) newMiscAssignedBy.value = savedName;
             }
 
+            if (newActionNoInput) {
+                newActionNoInput.addEventListener('blur', () => {
+                    const value = newActionNoInput.value.trim();
+                    if (!value || isMiscMode()) return;
+                    if (itemNoExistsInCurrentData(value)) {
+                        showNotification('Conflict', `This ${getSingularLabel()} Number already exists for this data type.`);
+                    }
+                });
+            }
+            if (newMiscTaskNoInput) {
+                newMiscTaskNoInput.addEventListener('blur', () => {
+                    const value = newMiscTaskNoInput.value.trim();
+                    if (!value) return;
+                    if (itemNoExistsInCurrentData(value, 'Miscellaneous')) {
+                        showNotification('Conflict', 'This Task Number already exists.');
+                    }
+                });
+            }
+
             if (addActionBtn) {
                 addActionBtn.addEventListener('click', async () => {
                     console.log('Add button clicked');
@@ -785,6 +813,10 @@
                             showNotification('Error', 'Task No., Title, Assigned Team, and Assigned By are required.');
                             return;
                         }
+                        if (itemNoExistsInCurrentData(taskNo, 'Miscellaneous')) {
+                            showNotification('Conflict', 'This Task Number already exists.');
+                            return;
+                        }
                         const gmName = assignedBy;
                         localStorage.setItem('displayName', gmName);
                         const createdDate = newMiscCreatedDateHidden ? newMiscCreatedDateHidden.value : '';
@@ -824,6 +856,10 @@
                     const singularLabel = getSingularLabel();
                     if (!actionNo) {
                         showNotification('Error', `${singularLabel} No. is required.`);
+                        return;
+                    }
+                    if (itemNoExistsInCurrentData(actionNo)) {
+                        showNotification('Conflict', `This ${singularLabel} Number already exists for this data type.`);
                         return;
                     }
                     const itsmTicket = document.getElementById('new-itsm-ticket')?.value || '';
@@ -1620,10 +1656,13 @@
                 return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
             }
 
-            function renderDescriptionCell(description) {
-                const text = description || 'N/A';
-                const titleAttr = description ? ` title="${escapeAttr(description)}"` : '';
-                return `<td class="cell-description"${titleAttr}><span class="cell-description-text">${text}</span></td>`;
+            function renderTableCell(value, { html = false, tdClass = '', tdAttrs = '' } = {}) {
+                const inner = (value !== undefined && value !== null && value !== '') ? value : 'N/A';
+                const titleAttr = !html && value ? ` title="${escapeAttr(String(value))}"` : '';
+                const classAttr = [tdClass, ''].filter(Boolean).join(' ').trim();
+                const className = classAttr ? ` class="${classAttr}"` : '';
+                const attrs = tdAttrs ? ` ${tdAttrs}` : '';
+                return `<td${className}${attrs}${titleAttr}><span class="cell-text">${inner}</span></td>`;
             }
 
             function setupDualDatePicker(displayId, hiddenId, onChange) {
@@ -3173,16 +3212,16 @@
                             : `<svg ${hideRowIconAttrs} class="hide-row-icon" title="Hide row"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
                         const completedDate = item['Completed Date'] && item['Completed Date'].trim() ? item['Completed Date'] : 'N/A';
                         tr.innerHTML = `
-                            <td>${hideRowIconHtml}</td>
-                            <td data-id="${itemNo}">${itemNo || 'N/A'}</td>
-                            <td>${item['Title'] || 'N/A'}</td>
-                            ${renderDescriptionCell(item['Description'])}
-                            <td>${item['Assigned Team'] || 'N/A'}</td>
-                            <td>${item['Assigned By'] || 'N/A'}</td>
-                            <td><span class="status status-${statusClass}">${statusText}</span></td>
-                            <td>${formatDateForDisplay(item['Due Date'])}</td>
-                            <td>${formatDateForDisplay(item['Created Date'])}</td>
-                            <td class="age-column ${!isClosed ? 'urgent' : ''}">${ageDisplay}</td>
+                            <td class="cell-no-clamp">${hideRowIconHtml}</td>
+                            ${renderTableCell(itemNo, { tdAttrs: `data-id="${itemNo}"` })}
+                            ${renderTableCell(item['Title'])}
+                            ${renderTableCell(item['Description'])}
+                            ${renderTableCell(item['Assigned Team'])}
+                            ${renderTableCell(item['Assigned By'])}
+                            ${renderTableCell(`<span class="status status-${statusClass}">${statusText}</span>`, { html: true })}
+                            ${renderTableCell(formatDateForDisplay(item['Due Date']))}
+                            ${renderTableCell(formatDateForDisplay(item['Created Date']))}
+                            ${renderTableCell(ageDisplay, { tdClass: `age-column${!isClosed ? ' urgent' : ''}` })}
                         `;
                         const activeItemId = document.querySelector('.detail-title h3')?.getAttribute('data-id');
                         if (activeItemId === itemNo) tr.style.backgroundColor = 'var(--hover-bg)';
@@ -3243,25 +3282,25 @@
                         : `<svg ${hideRowIconAttrs} class="hide-row-icon" title="Hide row from view" aria-label="Hide row from view"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
 
                     tr.innerHTML = `
-                        <td>${hideRowIconHtml}</td>
-                        <td data-id="${itemNo || ''}">${itemNo || 'N/A'}</td>
-                        <td>${item['ITSM Ticket'] || 'N/A'}</td>
-                        <td>${titleDisplay}</td>
-                        ${renderDescriptionCell(item['Description'])}
-                        <td>${item['System'] || 'N/A'}</td>
-                        <td>${item['Owner'] || 'N/A'}</td>
-                        <td><span class="status status-${statusClass}">${statusText}</span></td>
-                        <td>${formatDateForDisplay(item['Action Start Date'])}</td>
-                        <td>${formatTimeAMPM(item['Start Time'])}</td>
-                        <td>${formatDateForDisplay(item['Target Date'])}</td>
-                        <td>${formatDateForDisplay(item['Resolution Date'])}</td>
-                        <td>${formatTimeAMPM(item['Resolution Time'])}</td>
-                        <td>${formatDateForDisplay(endDate)}</td>
-                        <td>${formatTimeAMPM(item['Closure Time'])}</td>
-                        <td class="age-column ${!isClosed ? 'urgent' : ''}">${ageDisplay}</td>
-                        <td>${formatVal(item['Time to Acknowledge'])}</td>
-                        <td>${formatVal(item['Time to Recover'])}</td>
-                        <td>${formatVal(item['Time to Detect'])}</td>
+                        <td class="cell-no-clamp">${hideRowIconHtml}</td>
+                        ${renderTableCell(itemNo, { tdAttrs: `data-id="${itemNo || ''}"` })}
+                        ${renderTableCell(item['ITSM Ticket'])}
+                        ${renderTableCell(titleDisplay, { html: true })}
+                        ${renderTableCell(item['Description'])}
+                        ${renderTableCell(item['System'])}
+                        ${renderTableCell(item['Owner'])}
+                        ${renderTableCell(`<span class="status status-${statusClass}">${statusText}</span>`, { html: true })}
+                        ${renderTableCell(formatDateForDisplay(item['Action Start Date']))}
+                        ${renderTableCell(formatTimeAMPM(item['Start Time']))}
+                        ${renderTableCell(formatDateForDisplay(item['Target Date']))}
+                        ${renderTableCell(formatDateForDisplay(item['Resolution Date']))}
+                        ${renderTableCell(formatTimeAMPM(item['Resolution Time']))}
+                        ${renderTableCell(formatDateForDisplay(endDate))}
+                        ${renderTableCell(formatTimeAMPM(item['Closure Time']))}
+                        ${renderTableCell(ageDisplay, { tdClass: `age-column${!isClosed ? ' urgent' : ''}` })}
+                        ${renderTableCell(formatVal(item['Time to Acknowledge']))}
+                        ${renderTableCell(formatVal(item['Time to Recover']))}
+                        ${renderTableCell(formatVal(item['Time to Detect']))}
                     `;
                     
                     // Re-highlight if this was the selected row
