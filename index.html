@@ -3194,7 +3194,7 @@
                 paginatedItems.forEach(item => {
                     const tr = document.createElement('tr');
                     const isClosed = isItemClosed(item);
-                    const statusText = isClosed ? 'Closed' : (item[getItemStatusField(item)] || item['Action Status'] || 'Open');
+                    const statusText = isClosed ? 'Closed' : 'Open';
                     const statusClass = statusText.toLowerCase().replace(/\s+/g, '-');
                     const itemNo = getItemNo(item);
 
@@ -3652,7 +3652,7 @@
                     const currentSystemName = item['System'] || 'N/A';
                     const currentOwnerName = item['Owner'] || 'N/A';
                     const isClosed = isItemClosed(item);
-                    const currentStatusValue = isClosed ? 'Closed' : (item['Action Status'] || 'Open');
+                    const currentStatusValue = isClosed ? 'Closed' : 'Open';
                     const startDateDisplay = formatDateForDisplay(item['Action Start Date'] || 'N/A');
                     const targetDateDisplay = formatDateForDisplay(item['Target Date'] || 'N/A');
                     const showVendorField = raState.currentTab === 'actions' && raState.currentScope === 'external';

@@ -464,6 +464,15 @@ DATE_FIELDS = {"action_start_date", "target_date", "target_date_last_update", "r
 TIME_FIELDS = {"start_time", "end_time", "resolution_time"}
 
 
+def normalize_action_status(status):
+    """Incident/Crisis action status is Open or Closed only."""
+    if status is None:
+        return "Open"
+    if str(status).strip().lower() in ("closed", "close"):
+        return "Closed"
+    return "Open"
+
+
 def get_db_connection():
     """Returns a connection to the SQLite database with row_factory set."""
     conn = sqlite3.connect(DB_PATH)
@@ -500,11 +509,11 @@ def row_to_dict(item_row, week_status_row=None):
     
     # Add week status fields if provided
     if week_status_row:
-        item["Action Status"] = week_status_row["action_status"] if week_status_row["action_status"] else ""
+        item["Action Status"] = normalize_action_status(week_status_row["action_status"])
         item["End Date"] = week_status_row["end_date"] if week_status_row["end_date"] else ""
         item["Closure Time"] = week_status_row["end_time"] if week_status_row["end_time"] else ""
     else:
-        item["Action Status"] = ""
+        item["Action Status"] = "Open"
         item["End Date"] = ""
         item["Closure Time"] = ""
     
@@ -1354,7 +1363,7 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                             INSERT OR REPLACE INTO week_status (action_id, year, week, action_status, end_date, end_time)
                             VALUES (?, ?, ?, ?, ?, ?)
                         """, (item_id, year, week,
-                              row.get("Action Status", ""),
+                              normalize_action_status(row.get("Action Status", "")),
                               normalize_date(row.get("End Date", "")),
                               row.get("Closure Time", "")))
                         
@@ -1394,8 +1403,8 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                                 changed = True
                             else:
                                 if "Action Status" in present_columns:
-                                    csv_status = str(row.get("Action Status", "")).strip()
-                                    db_status = str(existing_status["action_status"] or "").strip()
+                                    csv_status = normalize_action_status(row.get("Action Status", ""))
+                                    db_status = normalize_action_status(existing_status["action_status"])
                                     if csv_status != db_status:
                                         changed = True
                                 if not changed and "End Date" in present_columns:
@@ -1439,8 +1448,10 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                                     WHERE action_id = ? AND year = ? AND week = ?
                                 """, (item_id, year, week))
                                 existing_status = cursor.fetchone()
-                                action_status = row.get("Action Status", "") if "Action Status" in present_columns else (
-                                    existing_status["action_status"] if existing_status else ""
+                                action_status = normalize_action_status(
+                                    row.get("Action Status", "") if "Action Status" in present_columns else (
+                                        existing_status["action_status"] if existing_status else ""
+                                    )
                                 )
                                 end_date = normalize_date(row.get("End Date", "")) if "End Date" in present_columns else (
                                     existing_status["end_date"] if existing_status else ""
@@ -1589,7 +1600,7 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                                     INSERT OR REPLACE INTO week_status (action_id, year, week, action_status, end_date, end_time)
                                     VALUES (?, ?, ?, ?, ?, ?)
                                 """, (item_id, year, week,
-                                      action.get("Action Status", ""),
+                                      normalize_action_status(action.get("Action Status", "")),
                                       action.get("End Date", ""),
                                       normalized_end_time))
                                 
@@ -2037,7 +2048,7 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                     nearest = cursor.fetchone()
 
                 if nearest:
-                    status_val = nearest["action_status"] or ""
+                    status_val = normalize_action_status(nearest["action_status"])
                     end_date_val = nearest["end_date"] or ""
                     end_time_val = nearest["end_time"] or ""
 
@@ -2270,7 +2281,7 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                         INSERT OR REPLACE INTO week_status (action_id, year, week, action_status, end_date, end_time)
                         VALUES (?, ?, ?, ?, ?, ?)
                     """, (item_id, year, week,
-                          item.get("Action Status", ""),
+                          normalize_action_status(item.get("Action Status", "")),
                           item.get("End Date", ""),
                           normalized_end_time))
         
@@ -2362,7 +2373,7 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                     INSERT OR REPLACE INTO week_status (action_id, year, week, action_status, end_date, end_time)
                     VALUES (?, ?, ?, ?, ?, ?)
                 """, (item_id, year, week,
-                      new_item.get("Action Status", ""),
+                      normalize_action_status(new_item.get("Action Status", "")),
                       new_item.get("End Date", ""),
                       normalized_end_time))
 
@@ -2397,7 +2408,7 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                 INSERT OR REPLACE INTO week_status (action_id, year, week, action_status, end_date, end_time)
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (item_id, year, week,
-                  new_item.get("Action Status", ""),
+                  normalize_action_status(new_item.get("Action Status", "")),
                   new_item.get("End Date", ""),
                   normalized_end_time))
             

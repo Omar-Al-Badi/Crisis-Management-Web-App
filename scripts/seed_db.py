@@ -21,6 +21,7 @@ from app import (  # noqa: E402
     init_db,
     item_dict_to_db_values,
     misc_dict_core_values,
+    normalize_action_status,
     normalize_time_to_24h,
 )
 
@@ -44,6 +45,36 @@ def _iso_days_ahead(days):
     return (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d")
 
 
+def _dmy_days_ago(days):
+    return (datetime.now() - timedelta(days=days)).strftime("%d/%m/%Y")
+
+
+def _dmy_days_ahead(days):
+    return (datetime.now() + timedelta(days=days)).strftime("%d/%m/%Y")
+
+
+def format_remark(date_dmy, text):
+    return f"[{date_dmy}] {text}"
+
+
+def format_action(date_dmy, assignee, text, *, scope="internal", vendor_ticket=None, closed=False):
+    parts = [f"[{date_dmy}]"]
+    if scope == "external":
+        parts.append("[EXTERNAL]")
+    if assignee:
+        parts.append(f"[{assignee}]")
+    if scope == "external" and vendor_ticket:
+        parts.append(f"[Vendor: {vendor_ticket}]")
+    if closed:
+        parts.append("[CLOSED]")
+    body = (text or "").strip()
+    return f"{' '.join(parts)} {body}" if body else " ".join(parts)
+
+
+def join_entries(*lines):
+    return "\r\n".join(lines)
+
+
 def demo_incidents():
     return [
         {
@@ -62,8 +93,16 @@ def demo_incidents():
             "Target Date": _iso_days_ahead(7),
             "Resolution Date": "",
             "Resolution Time": "",
-            "Remarks": "Monitoring error rates; vendor engaged.",
-            "Actions": "Increase connection pool; review firewall rules.",
+            "Remarks": join_entries(
+                format_remark(_dmy_days_ago(5), "Incident opened; error rate spike confirmed."),
+                format_remark(_dmy_days_ago(3), "Vendor engaged; monitoring dashboards updated."),
+                format_remark(_dmy_days_ago(1), "Awaiting vendor RCA draft."),
+            ),
+            "Actions": join_entries(
+                format_action(_dmy_days_ago(4), "Ops Team A", "Increase connection pool on payment API."),
+                format_action(_dmy_days_ago(2), "Network Ops", "Review firewall rules for timeout patterns."),
+                format_action(_dmy_days_ago(1), "Ops Team A", "Validate fix in UAT before prod rollout."),
+            ),
             "End Date": "",
             "Closure Time": "",
             "Target Date last update": _iso_days_ago(2),
@@ -87,15 +126,29 @@ def demo_incidents():
             "Action Tracker ( Weekly Crisis Meeting)": "Yes",
             "Crisis/Incident": "Slow login response",
             "Description": "Users report 30+ second login delays during peak hours.",
-            "Action Status": "In Progress",
+            "Action Status": "Open",
             "Owner": "App Support",
             "Action Start Date": _iso_days_ago(10),
             "Start Time": "14:30",
             "Target Date": _iso_days_ahead(3),
             "Resolution Date": "",
             "Resolution Time": "",
-            "Remarks": "Index rebuild scheduled for weekend.",
-            "Actions": "Profile DB queries; add read replica.",
+            "Remarks": join_entries(
+                format_remark(_dmy_days_ago(10), "Login latency reported by multiple branches."),
+                format_remark(_dmy_days_ago(6), "DB profiling shows missing index on session table."),
+                format_remark(_dmy_days_ago(2), "Index rebuild scheduled for weekend maintenance window."),
+            ),
+            "Actions": join_entries(
+                format_action(_dmy_days_ago(8), "App Support", "Profile DB queries during peak load."),
+                format_action(_dmy_days_ago(5), "DBA Team", "Add read replica for authentication service."),
+                format_action(
+                    _dmy_days_ago(3),
+                    "Vendor Support",
+                    "Request emergency patch for CRM auth module.",
+                    scope="external",
+                    vendor_ticket="VND-88421",
+                ),
+            ),
             "End Date": "",
             "Closure Time": "",
             "Target Date last update": _iso_days_ago(1),
@@ -126,8 +179,33 @@ def demo_incidents():
             "Target Date": _iso_days_ago(7),
             "Resolution Date": _iso_days_ago(6),
             "Resolution Time": "16:45",
-            "Remarks": "Carrier replaced faulty SFP module.",
-            "Actions": "Failover tested; runbook updated.",
+            "Remarks": join_entries(
+                format_remark(_dmy_days_ago(14), "BGP flaps detected on regional MPLS circuit."),
+                format_remark(_dmy_days_ago(8), "Carrier dispatched field engineer to branch site."),
+                format_remark(_dmy_days_ago(6), "Faulty SFP module replaced; link stable for 24 hours."),
+            ),
+            "Actions": join_entries(
+                format_action(
+                    _dmy_days_ago(12),
+                    "Network Ops",
+                    "Initiate failover to backup WAN link.",
+                    closed=True,
+                ),
+                format_action(
+                    _dmy_days_ago(7),
+                    "Carrier NOC",
+                    "Replace faulty SFP module on branch router.",
+                    scope="external",
+                    vendor_ticket="CAR-55201",
+                    closed=True,
+                ),
+                format_action(
+                    _dmy_days_ago(6),
+                    "Network Ops",
+                    "Update runbook with failover test results.",
+                    closed=True,
+                ),
+            ),
             "End Date": _iso_days_ago(6),
             "Closure Time": "16:45",
             "Target Date last update": _iso_days_ago(7),
@@ -163,8 +241,16 @@ def demo_crises():
             "Target Date": _iso_days_ahead(1),
             "Resolution Date": "",
             "Resolution Time": "",
-            "Remarks": "Crisis bridge standing; hourly updates to leadership.",
-            "Actions": "Validate generator fuel; confirm DR readiness.",
+            "Remarks": join_entries(
+                format_remark(_dmy_days_ago(2), "Crisis bridge convened; failover to secondary site active."),
+                format_remark(_dmy_days_ago(1), "Hourly leadership updates in progress."),
+                format_remark(_dmy_days_ago(0), "UPS vendor ETA confirmed for completion today."),
+            ),
+            "Actions": join_entries(
+                format_action(_dmy_days_ago(2), "DC Operations", "Validate generator fuel levels and load test."),
+                format_action(_dmy_days_ago(1), "DR Team", "Confirm DR site readiness and network paths."),
+                format_action(_dmy_days_ago(0), "Crisis PMO", "Coordinate return-to-primary timeline with vendor."),
+            ),
             "End Date": "",
             "Closure Time": "",
             "Target Date last update": _iso_days_ago(1),
@@ -195,8 +281,31 @@ def demo_crises():
             "Target Date": _iso_days_ago(5),
             "Resolution Date": _iso_days_ago(4),
             "Resolution Time": "18:00",
-            "Remarks": "User awareness bulletin sent.",
-            "Actions": "Block sender domains; reset affected mailboxes.",
+            "Remarks": join_entries(
+                format_remark(_dmy_days_ago(8), "Phishing campaign detected by email gateway."),
+                format_remark(_dmy_days_ago(5), "Malicious domains blocked; no credential compromise found."),
+                format_remark(_dmy_days_ago(4), "User awareness bulletin sent to all staff."),
+            ),
+            "Actions": join_entries(
+                format_action(
+                    _dmy_days_ago(7),
+                    "SOC",
+                    "Block sender domains at email gateway.",
+                    closed=True,
+                ),
+                format_action(
+                    _dmy_days_ago(6),
+                    "SOC",
+                    "Reset affected mailboxes and enforce MFA.",
+                    closed=True,
+                ),
+                format_action(
+                    _dmy_days_ago(4),
+                    "Security Comms",
+                    "Publish phishing awareness bulletin.",
+                    closed=True,
+                ),
+            ),
             "End Date": _iso_days_ago(4),
             "Closure Time": "18:00",
             "Target Date last update": _iso_days_ago(5),
@@ -227,8 +336,13 @@ def demo_misc_tasks():
             "Created Date": _iso_days_ago(4),
             "Created Time": "10:00",
             "Due Date": _iso_days_ahead(10),
-            "Remarks": "Awaiting HR confirmation on new hires.",
-            "Actions": "Draft updated matrix; circulate for sign-off.",
+            "Remarks": join_entries(
+                format_remark(_dmy_days_ago(4), "Task assigned; awaiting HR confirmation on new hires."),
+            ),
+            "Actions": join_entries(
+                format_action(_dmy_days_ago(3), "Crisis PMO", "Draft updated on-call roster and escalation matrix."),
+                format_action(_dmy_days_ago(1), "Crisis PMO", "Circulate matrix for GM sign-off."),
+            ),
             "Completed Date": "",
             "Completed Time": "",
             "Hidden": "0",
@@ -244,8 +358,24 @@ def demo_misc_tasks():
             "Created Date": _iso_days_ago(20),
             "Created Time": "09:30",
             "Due Date": _iso_days_ago(5),
-            "Remarks": "Report submitted to leadership.",
-            "Actions": "File report; schedule follow-up remediation tasks.",
+            "Remarks": join_entries(
+                format_remark(_dmy_days_ago(5), "DR test report draft completed."),
+                format_remark(_dmy_days_ago(3), "Report submitted to leadership."),
+            ),
+            "Actions": join_entries(
+                format_action(
+                    _dmy_days_ago(8),
+                    "Infrastructure",
+                    "Summarize DR test findings and gaps.",
+                    closed=True,
+                ),
+                format_action(
+                    _dmy_days_ago(4),
+                    "Infrastructure",
+                    "Schedule follow-up remediation tasks with owners.",
+                    closed=True,
+                ),
+            ),
             "Completed Date": _iso_days_ago(3),
             "Completed Time": "15:00",
             "Hidden": "0",
@@ -294,7 +424,7 @@ def insert_item(cursor, data_type, action, year, week):
             item_id,
             year,
             week,
-            action.get("Action Status", ""),
+            normalize_action_status(action.get("Action Status", "")),
             action.get("End Date", ""),
             normalized_end_time,
         ),
