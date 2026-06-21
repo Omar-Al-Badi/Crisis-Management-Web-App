@@ -131,8 +131,8 @@ def demo_incidents():
             "Action Start Date": _iso_days_ago(10),
             "Start Time": "14:30",
             "Target Date": _iso_days_ahead(3),
-            "Resolution Date": "",
-            "Resolution Time": "",
+            "Resolution Date": _iso_days_ago(2),
+            "Resolution Time": "11:00",
             "Remarks": join_entries(
                 format_remark(_dmy_days_ago(10), "Login latency reported by multiple branches."),
                 format_remark(_dmy_days_ago(6), "DB profiling shows missing index on session table."),

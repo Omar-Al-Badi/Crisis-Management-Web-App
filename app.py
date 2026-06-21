@@ -36,6 +36,29 @@ COLUMNS = [
     "Time to Acknowledge", "Time to Recover", "Time to Detect", "Hidden"
 ]
 
+# Friendlier CSV headers for Excel export (internal/import keys stay in COLUMNS).
+EXPORT_COLUMN_LABELS = {
+    "End Date": "Closure Date",
+    "Resolution Date": "Resolution Date (Issue Fixed)",
+    "Action Status": "Incident Status",
+}
+
+IMPORT_HEADER_ALIASES = {
+    "Closure Date": "End Date",
+    "Incident Status": "Action Status",
+    "Resolution Date (Issue Fixed)": "Resolution Date",
+}
+
+MISC_EXPORT_COLUMN_LABELS = {
+    "Completed Date": "Closure Date",
+    "Status": "Task Status",
+}
+
+MISC_IMPORT_HEADER_ALIASES = {
+    "Closure Date": "Completed Date",
+    "Task Status": "Status",
+}
+
 # Mapping from CSV column names to SQLite column names (sanitized for SQL)
 CSV_TO_DB = {
     "Action No.": "action_no",
@@ -473,6 +496,200 @@ def normalize_action_status(status):
     return "Open"
 
 
+def is_item_closed(action_status, end_date):
+    """Whether an incident/crisis is closed by status or closure date."""
+    status = normalize_action_status(action_status)
+    end = (end_date or "").strip()
+    return status == "Closed" or (bool(end) and end.lower() != "n/a")
+
+
+def parse_date_str(date_str):
+    """Parse a date string into datetime, or None."""
+    if not date_str or str(date_str).strip().lower() == "n/a":
+        return None
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d-%b-%Y"):
+        try:
+            return datetime.strptime(str(date_str).strip(), fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def closure_week_from_end_date(end_date_str):
+    """Return (year, week) for a closure date using Sunday-based %U weeks."""
+    parsed = parse_date_str(end_date_str)
+    if not parsed:
+        return None, None
+    return int(parsed.year), int(parsed.strftime("%U"))
+
+
+def is_week_after(year_a, week_a, year_b, week_b):
+    """True when week period A is strictly after week period B."""
+    return (year_a, week_a) > (year_b, week_b)
+
+
+def delete_future_week_status(cursor, action_id, year, week):
+    """Remove week_status rows after the given year/week."""
+    cursor.execute("""
+        DELETE FROM week_status
+        WHERE action_id = ? AND (year > ? OR (year = ? AND week > ?))
+    """, (action_id, year, year, week))
+
+
+def cleanup_stale_open_before_latest(cursor, action_id):
+    """Delete Open rows after a closure when a later week_status row exists."""
+    prior_closed = None
+    cursor.execute("""
+        SELECT year, week, action_status, end_date
+        FROM week_status
+        WHERE action_id = ?
+        ORDER BY year DESC, week DESC
+    """, (action_id,))
+    rows = cursor.fetchall()
+    if not rows:
+        return False
+
+    latest_year, latest_week = rows[0]["year"], rows[0]["week"]
+    for row in reversed(rows):
+        if is_item_closed(row["action_status"], row["end_date"]):
+            prior_closed = row
+            break
+
+    if not prior_closed:
+        return False
+
+    close_year, close_week = closure_week_from_end_date(prior_closed["end_date"])
+    if close_year is None:
+        close_year, close_week = prior_closed["year"], prior_closed["week"]
+
+    changed = False
+    for row in rows:
+        if (row["year"], row["week"]) == (latest_year, latest_week):
+            continue
+        if not is_week_after(row["year"], row["week"], close_year, close_week):
+            continue
+        if is_item_closed(row["action_status"], row["end_date"]):
+            continue
+        cursor.execute(
+            "DELETE FROM week_status WHERE action_id = ? AND year = ? AND week = ?",
+            (action_id, row["year"], row["week"]),
+        )
+        changed = True
+    return changed
+
+
+def get_prior_closed_week_status(cursor, action_id, year, week):
+    """Most recent closed week_status strictly before the given year/week."""
+    cursor.execute("""
+        SELECT year, week, action_status, end_date, end_time
+        FROM week_status
+        WHERE action_id = ? AND (year < ? OR (year = ? AND week < ?))
+        ORDER BY year DESC, week DESC
+    """, (action_id, year, year, week))
+    for row in cursor.fetchall():
+        if is_item_closed(row["action_status"], row["end_date"]):
+            return row
+    return None
+
+
+def should_carry_status_to_week(action_status, end_date, target_year, target_week):
+    """Whether GET carry-over should copy a status row into the target week."""
+    if not is_item_closed(action_status, end_date):
+        return True
+    close_year, close_week = closure_week_from_end_date(end_date)
+    if close_year is None:
+        return True
+    return target_year == close_year and target_week == close_week
+
+
+def clear_stale_open_rows_after_closure(cursor, action_id, before_year, before_week):
+    """Delete stale Open rows between a prior closure week and a target week."""
+    prior_closed = get_prior_closed_week_status(cursor, action_id, before_year, before_week)
+    if not prior_closed:
+        return
+
+    close_year, close_week = closure_week_from_end_date(prior_closed["end_date"])
+    if close_year is None:
+        close_year, close_week = prior_closed["year"], prior_closed["week"]
+
+    cursor.execute("""
+        SELECT year, week, action_status, end_date
+        FROM week_status
+        WHERE action_id = ?
+          AND (year > ? OR (year = ? AND week > ?))
+          AND (year < ? OR (year = ? AND week < ?))
+    """, (
+        action_id,
+        close_year, close_year, close_week,
+        before_year, before_year, before_week,
+    ))
+    for row in cursor.fetchall():
+        if not is_item_closed(row["action_status"], row["end_date"]):
+            cursor.execute(
+                "DELETE FROM week_status WHERE action_id = ? AND year = ? AND week = ?",
+                (action_id, row["year"], row["week"]),
+            )
+
+
+def reconcile_stale_open_week_status(cursor, action_id, year, week, action_status, end_date, end_time):
+    """
+    Legacy safety net: align stale Open rows after closure with the closure record.
+    Intentional reopens at the latest week_status row are left unchanged.
+    """
+    if is_item_closed(action_status, end_date):
+        return action_status, end_date, end_time
+
+    prior_closed = get_prior_closed_week_status(cursor, action_id, year, week)
+    if not prior_closed:
+        return action_status, end_date, end_time
+
+    close_year, close_week = closure_week_from_end_date(prior_closed["end_date"])
+    if close_year is None:
+        close_year, close_week = prior_closed["year"], prior_closed["week"]
+
+    if not is_week_after(year, week, close_year, close_week):
+        return action_status, end_date, end_time
+
+    cursor.execute("""
+        SELECT year, week
+        FROM week_status
+        WHERE action_id = ?
+        ORDER BY year DESC, week DESC
+        LIMIT 1
+    """, (action_id,))
+    latest = cursor.fetchone()
+    if latest and latest["year"] == year and latest["week"] == week:
+        return action_status, end_date, end_time
+
+    reconciled_status = normalize_action_status(prior_closed["action_status"])
+    reconciled_end_date = prior_closed["end_date"] or ""
+    reconciled_end_time = prior_closed["end_time"] or ""
+    cursor.execute("""
+        UPDATE week_status
+        SET action_status = ?, end_date = ?, end_time = ?
+        WHERE action_id = ? AND year = ? AND week = ?
+    """, (
+        reconciled_status,
+        reconciled_end_date,
+        reconciled_end_time,
+        action_id,
+        year,
+        week,
+    ))
+    return reconciled_status, reconciled_end_date, reconciled_end_time
+
+
+def apply_week_status_side_effects(cursor, item_id, year, week, new_item):
+    """Keep week_status rows consistent when closing or reopening."""
+    status = normalize_action_status(new_item.get("Action Status", ""))
+    end_date = new_item.get("End Date", "") or ""
+    if is_item_closed(status, end_date):
+        delete_future_week_status(cursor, item_id, year, week)
+    else:
+        clear_stale_open_rows_after_closure(cursor, item_id, year, week)
+        delete_future_week_status(cursor, item_id, year, week)
+
+
 def get_db_connection():
     """Returns a connection to the SQLite database with row_factory set."""
     conn = sqlite3.connect(DB_PATH)
@@ -553,13 +770,74 @@ def detect_import_delimiter(text):
         return '\t' if tab_count > comma_count else ','
 
 
-def match_header_to_canonical(raw_header, expected_headers, used):
+def export_column_labels(columns, label_map):
+    """Map internal column names to export-friendly CSV headers."""
+    return [label_map.get(col, col) for col in columns]
+
+
+def item_dict_to_export_row(item_dict, columns, label_map):
+    """Build a CSV row dict keyed by export header labels."""
+    row = {}
+    for col in columns:
+        label = label_map.get(col, col)
+        row[label] = item_dict.get(col, "")
+    return row
+
+
+def build_export_metadata(data_type, range_type, year="", week=""):
+    """Comment lines prepended to CSV exports for Excel context."""
+    generated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if range_type == "all":
+        scope = "All Time (latest status per item across all weeks)"
+        filename_hint = f"All {EXPORT_PLURAL.get(data_type, data_type + 's')}"
+    else:
+        scope = f"Current Week {year} Week {week}"
+        filename_hint = f"{data_type}_Status_{year}_Week_{week}"
+    return [
+        f"# Export generated: {generated}",
+        f"# Data type: {data_type}",
+        f"# Range: {scope}",
+        f"# Filename: {filename_hint}.csv",
+        "# Closure Date = meeting closure (matches web Closure Date).",
+        "# Resolution Date (Issue Fixed) = technical fix date (may differ from closure).",
+        "# Incident Status = Open/Closed for the exported week snapshot.",
+    ]
+
+
+def write_export_csv(output, columns, label_map, rows, metadata_lines=None):
+    """Write CSV with optional metadata comment lines and friendly headers."""
+    fieldnames = export_column_labels(columns, label_map)
+    if metadata_lines:
+        for line in metadata_lines:
+            output.write(line + "\n")
+    writer = csv.DictWriter(
+        output,
+        fieldnames=fieldnames,
+        extrasaction="ignore",
+        quoting=csv.QUOTE_ALL,
+    )
+    writer.writeheader()
+    for item_dict in rows:
+        writer.writerow(item_dict_to_export_row(item_dict, columns, label_map))
+
+
+def match_header_to_canonical(raw_header, expected_headers, used, aliases=None):
     """Map a pasted header cell to a canonical column name."""
     raw = raw_header.strip()
     if not raw:
         return None
 
     raw_lower = raw.lower()
+
+    if aliases:
+        canonical = aliases.get(raw)
+        if not canonical:
+            for alias, target in aliases.items():
+                if alias.lower() == raw_lower:
+                    canonical = target
+                    break
+        if canonical and canonical in expected_headers and canonical not in used:
+            return canonical
 
     for exp in expected_headers:
         if exp not in used and exp.lower() == raw_lower:
@@ -591,43 +869,43 @@ def match_header_to_canonical(raw_header, expected_headers, used):
     return None
 
 
-def count_header_matches(row, expected_headers):
+def count_header_matches(row, expected_headers, aliases=None):
     used = set()
     matches = 0
     for cell in row:
-        canonical = match_header_to_canonical(cell, expected_headers, used)
+        canonical = match_header_to_canonical(cell, expected_headers, used, aliases=aliases)
         if canonical:
             used.add(canonical)
             matches += 1
     return matches
 
 
-def row_looks_like_header(row, expected_headers):
+def row_looks_like_header(row, expected_headers, aliases=None):
     if not row:
         return False
     id_header = expected_headers[0]
     if row[0].strip() == id_header:
         return True
-    matches = count_header_matches(row, expected_headers)
+    matches = count_header_matches(row, expected_headers, aliases=aliases)
     return matches >= max(2, len(row) // 2)
 
 
-def row_looks_like_data(row, expected_headers, id_header):
+def row_looks_like_data(row, expected_headers, id_header, aliases=None):
     if not row or not any(cell.strip() for cell in row):
         return False
     if row[0].strip() == id_header:
         return False
-    if count_header_matches(row, expected_headers) >= max(2, len(row) // 2):
+    if count_header_matches(row, expected_headers, aliases=aliases) >= max(2, len(row) // 2):
         return False
     return True
 
 
-def map_header_row(raw_headers, expected_headers):
+def map_header_row(raw_headers, expected_headers, aliases=None):
     mapped = []
     present_columns = []
     used = set()
     for raw in raw_headers:
-        canonical = match_header_to_canonical(raw, expected_headers, used)
+        canonical = match_header_to_canonical(raw, expected_headers, used, aliases=aliases)
         if canonical:
             used.add(canonical)
             mapped.append(canonical)
@@ -640,9 +918,22 @@ def map_header_row(raw_headers, expected_headers):
     return mapped, present_columns
 
 
+def strip_export_metadata_rows(all_rows):
+    """Remove leading # comment lines from exported CSV files before import."""
+    rows = list(all_rows)
+    while rows and rows[0]:
+        first_cell = rows[0][0].strip() if rows[0] else ""
+        if first_cell.startswith("#"):
+            rows = rows[1:]
+            continue
+        break
+    return rows
+
+
 def parse_import_text(text, data_type):
     """Parse CSV/TSV import text into row dicts with column validation."""
     expected_headers = MISC_COLUMNS if data_type == "Miscellaneous" else COLUMNS
+    aliases = MISC_IMPORT_HEADER_ALIASES if data_type == "Miscellaneous" else IMPORT_HEADER_ALIASES
     id_header = expected_headers[0]
 
     validation = {
@@ -661,19 +952,19 @@ def parse_import_text(text, data_type):
         return [], set(), validation
 
     delimiter = detect_import_delimiter(text)
-    all_rows = list(csv.reader(io.StringIO(text), delimiter=delimiter))
+    all_rows = strip_export_metadata_rows(list(csv.reader(io.StringIO(text), delimiter=delimiter)))
 
     if not all_rows:
         validation["message"] = "Import data is empty"
         return [], set(), validation
 
-    has_header = row_looks_like_header(all_rows[0], expected_headers)
+    has_header = row_looks_like_header(all_rows[0], expected_headers, aliases=aliases)
 
     if has_header:
-        mapped_headers, present_columns = map_header_row(all_rows[0], expected_headers)
+        mapped_headers, present_columns = map_header_row(all_rows[0], expected_headers, aliases=aliases)
         data_rows_raw = all_rows[1:]
         header_row_num = 1
-    elif row_looks_like_data(all_rows[0], expected_headers, id_header):
+    elif row_looks_like_data(all_rows[0], expected_headers, id_header, aliases=aliases):
         mapped_headers = list(expected_headers)
         present_columns = list(expected_headers)
         data_rows_raw = all_rows
@@ -2008,21 +2299,54 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
 
         rows = cursor.fetchall()
 
+        made_changes = False
+        if not is_year_mode:
+            action_ids = {row["id"] for row in rows}
+            cleanup_changed = False
+            for action_id in action_ids:
+                if cleanup_stale_open_before_latest(cursor, action_id):
+                    cleanup_changed = True
+            if cleanup_changed:
+                cursor.execute("""
+                    SELECT a.*, ws.action_status, ws.end_date, ws.end_time
+                    FROM items a
+                    LEFT JOIN week_status ws ON a.id = ws.action_id AND ws.year = ? AND ws.week = ?
+                    WHERE a.data_type = ?
+                """, (year, week, data_type))
+                rows = cursor.fetchall()
+                made_changes = True
+
         items_with_status = [row for row in rows if row["action_status"] is not None]
         items_without_status = [row for row in rows if row["action_status"] is None]
 
         items = []
 
         for row in items_with_status:
+            item_id = row["id"]
+            action_status = row["action_status"]
+            end_date = row["end_date"]
+            end_time = row["end_time"]
+
+            if not is_year_mode:
+                reconciled = reconcile_stale_open_week_status(
+                    cursor, item_id, year, week, action_status, end_date, end_time
+                )
+                action_status, end_date, end_time = reconciled
+                if (
+                    action_status != row["action_status"]
+                    or (end_date or "") != (row["end_date"] or "")
+                    or (end_time or "") != (row["end_time"] or "")
+                ):
+                    made_changes = True
+
             week_status = {
-                "action_status": row["action_status"],
-                "end_date": row["end_date"],
-                "end_time": row["end_time"]
+                "action_status": action_status,
+                "end_date": end_date,
+                "end_time": end_time,
             }
             items.append(row_to_dict(row, week_status))
 
         if items_without_status and not is_year_mode:
-            made_changes = False
             for row in items_without_status:
                 item_id = row["id"]
 
@@ -2051,6 +2375,9 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                     status_val = normalize_action_status(nearest["action_status"])
                     end_date_val = nearest["end_date"] or ""
                     end_time_val = nearest["end_time"] or ""
+
+                    if not should_carry_status_to_week(status_val, end_date_val, year, week):
+                        continue
 
                     week_status = {
                         "action_status": status_val,
@@ -2376,6 +2703,7 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                       normalize_action_status(new_item.get("Action Status", "")),
                       new_item.get("End Date", ""),
                       normalized_end_time))
+                apply_week_status_side_effects(cursor, item_id, year, week, new_item)
 
                 # Update last modified time
                 os.utime(DB_PATH, None)
@@ -2411,6 +2739,7 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                   normalize_action_status(new_item.get("Action Status", "")),
                   new_item.get("End Date", ""),
                   normalized_end_time))
+            apply_week_status_side_effects(cursor, item_id, year, week, new_item)
             
             # Update last modified time
             os.utime(DB_PATH, None)
@@ -2504,11 +2833,14 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
                 actions.append(task_dict)
             conn.close()
             output = io.StringIO()
-            writer = csv.DictWriter(
-                output, fieldnames=MISC_COLUMNS, extrasaction='ignore', quoting=csv.QUOTE_ALL
+            metadata = build_export_metadata("Miscellaneous", range_type, year, week)
+            write_export_csv(
+                output,
+                MISC_COLUMNS,
+                MISC_EXPORT_COLUMN_LABELS,
+                actions,
+                metadata_lines=metadata,
             )
-            writer.writeheader()
-            writer.writerows(actions)
             csv_content = output.getvalue().encode('utf-8-sig')
             self.send_response(200)
             self.send_header("Content-Type", "text/csv")
@@ -2591,14 +2923,14 @@ class CrisisHandler(http.server.SimpleHTTPRequestHandler):
         
         # Generate CSV in-memory
         output = io.StringIO()
-        writer = csv.DictWriter(
+        metadata = build_export_metadata(data_type, range_type, year, week)
+        write_export_csv(
             output,
-            fieldnames=COLUMNS,
-            extrasaction='ignore',
-            quoting=csv.QUOTE_ALL
+            COLUMNS,
+            EXPORT_COLUMN_LABELS,
+            actions,
+            metadata_lines=metadata,
         )
-        writer.writeheader()
-        writer.writerows(actions)
         
         # Get the CSV content as bytes with BOM for Excel compatibility
         csv_content = output.getvalue().encode('utf-8-sig')
