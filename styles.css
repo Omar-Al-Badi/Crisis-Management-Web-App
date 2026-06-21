@@ -2355,6 +2355,36 @@ footer p {
     color: var(--text-main);
 }
 
+.export-context-label {
+    margin: 0 0 0.75rem;
+    font-size: 0.9rem;
+    color: var(--text-main);
+    font-weight: 500;
+}
+
+.export-hint {
+    margin: 0 0 1.25rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
+.closure-resolution-notice {
+    margin: 0.75rem 0 0;
+    padding: 0.65rem 0.85rem;
+    border-radius: var(--border-radius);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--text-main);
+    font-size: 0.85rem;
+    line-height: 1.45;
+}
+
+[data-theme="dark"] .closure-resolution-notice {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.4);
+}
+
 /* File Drop Zone */
 .file-drop-zone {
     display: flex;
